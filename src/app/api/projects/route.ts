@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { getDb, initDb } from '@/lib/db';
 import { getIronSession } from 'iron-session';
 import { sessionOptions, SessionData } from '@/lib/session';
 import { cookies } from 'next/headers';
@@ -14,16 +14,10 @@ export async function GET() {
   const userId = await getUser();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const db = await getDb();
-  const result = db.exec(`SELECT * FROM projects WHERE user_id = '${userId}' ORDER BY created_at DESC`);
-  if (!result.length) return NextResponse.json([]);
-
-  const projects = result[0].values.map((row: unknown[]) => {
-    const obj: Record<string, unknown> = {};
-    result[0].columns.forEach((col: string, i: number) => { obj[col] = row[i]; });
-    return obj;
-  });
-  return NextResponse.json(projects);
+  await initDb();
+  const db = getDb();
+  const result = await db.execute({ sql: `SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC`, args: [userId] });
+  return NextResponse.json(result.rows);
 }
 
 export async function POST(req: NextRequest) {
@@ -31,10 +25,12 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { name, description, budget, start_date } = await req.json();
-  const db = await getDb();
+  await initDb();
+  const db = getDb();
   const id = uuid();
-  db.run(`INSERT INTO projects (id, user_id, name, description, budget, start_date) VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, userId, name, description || '', budget || 0, start_date || '']);
-  saveDb();
+  await db.execute({
+    sql: `INSERT INTO projects (id, user_id, name, description, budget, start_date) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [id, userId, name, description || '', budget || 0, start_date || ''],
+  });
   return NextResponse.json({ id });
 }

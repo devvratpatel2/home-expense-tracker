@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { getDb, initDb } from '@/lib/db';
 import { getIronSession } from 'iron-session';
 import { sessionOptions, SessionData } from '@/lib/session';
 import { cookies } from 'next/headers';
@@ -17,16 +17,10 @@ export async function GET(req: NextRequest) {
   const projectId = req.nextUrl.searchParams.get('projectId');
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
 
-  const db = await getDb();
-  const result = db.exec(`SELECT * FROM categories WHERE project_id = '${projectId}' ORDER BY name`);
-  if (!result.length) return NextResponse.json([]);
-
-  const cats = result[0].values.map((row: unknown[]) => {
-    const obj: Record<string, unknown> = {};
-    result[0].columns.forEach((col: string, i: number) => { obj[col] = row[i]; });
-    return obj;
-  });
-  return NextResponse.json(cats);
+  await initDb();
+  const db = getDb();
+  const result = await db.execute({ sql: `SELECT * FROM categories WHERE project_id = ? ORDER BY name`, args: [projectId] });
+  return NextResponse.json(result.rows);
 }
 
 export async function POST(req: NextRequest) {
@@ -34,9 +28,9 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { project_id, name, budget } = await req.json();
-  const db = await getDb();
+  await initDb();
+  const db = getDb();
   const id = uuid();
-  db.run(`INSERT INTO categories (id, project_id, name, budget) VALUES (?, ?, ?, ?)`, [id, project_id, name, budget || 0]);
-  saveDb();
+  await db.execute({ sql: `INSERT INTO categories (id, project_id, name, budget) VALUES (?, ?, ?, ?)`, args: [id, project_id, name, budget || 0] });
   return NextResponse.json({ id });
 }

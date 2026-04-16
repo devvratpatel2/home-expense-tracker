@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, initDb } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { getIronSession } from 'iron-session';
 import { sessionOptions, SessionData } from '@/lib/session';
@@ -7,23 +7,24 @@ import { cookies } from 'next/headers';
 
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json();
-  const db = await getDb();
-  const result = db.exec(`SELECT id, name, password FROM users WHERE email = '${email.replace(/'/g, "''")}'`);
+  await initDb();
+  const db = getDb();
+  const result = await db.execute({ sql: `SELECT id, name, password FROM users WHERE email = ?`, args: [email] });
 
-  if (!result.length || !result[0].values.length) {
+  if (!result.rows.length) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }
 
-  const [id, name, hash] = result[0].values[0] as string[];
-  if (!bcrypt.compareSync(password, hash)) {
+  const row = result.rows[0];
+  if (!bcrypt.compareSync(password, row.password as string)) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }
 
   const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-  session.userId = id;
+  session.userId = row.id as string;
   session.email = email;
-  session.name = name;
+  session.name = row.name as string;
   await session.save();
 
-  return NextResponse.json({ success: true, name });
+  return NextResponse.json({ success: true, name: row.name });
 }

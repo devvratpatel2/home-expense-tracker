@@ -1,26 +1,22 @@
-import initSqlJs, { Database } from 'sql.js';
-import fs from 'fs';
-import path from 'path';
+import { createClient, type Client } from '@libsql/client';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'tracker.db');
+let client: Client | null = null;
 
-let db: Database | null = null;
+export function getDb(): Client {
+  if (client) return client;
 
-export async function getDb(): Promise<Database> {
-  if (db) return db;
+  client = createClient({
+    url: process.env.TURSO_DATABASE_URL || 'file:data/tracker.db',
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
 
-  const SQL = await initSqlJs();
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return client;
+}
 
-  if (fs.existsSync(DB_PATH)) {
-    const buffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(buffer);
-  } else {
-    db = new SQL.Database();
-  }
+export async function initDb() {
+  const db = getDb();
 
-  db.run(`
+  await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
@@ -74,16 +70,4 @@ export async function getDb(): Promise<Database> {
       FOREIGN KEY (project_id) REFERENCES projects(id)
     );
   `);
-
-  saveDb();
-  return db;
-}
-
-export function saveDb() {
-  if (!db) return;
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(DB_PATH, buffer);
 }
