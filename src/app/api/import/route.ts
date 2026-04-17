@@ -35,13 +35,24 @@ export async function POST(req: NextRequest) {
   const db = getDb();
   let imported = 0;
 
+  // Helper to find a column value by trying multiple possible header names
+  const col = (row: Record<string, string>, ...keys: string[]) => {
+    for (const k of keys) {
+      const match = Object.keys(row).find(h => h.toLowerCase().replace(/[^a-z]/g, '') === k.toLowerCase().replace(/[^a-z]/g, ''));
+      if (match && row[match]) return row[match].trim();
+    }
+    return '';
+  };
+
+  const parseMoney = (v: string) => parseFloat(v.replace(/[$,]/g, '')) || 0;
+
   for (const row of records) {
-    const description = row.description || row.Description || row.item || row.Item || row.name || row.Name || '';
-    const amount = parseFloat(row.amount || row.Amount || row.cost || row.Cost || row.total || row.Total || '0');
-    const date = row.date || row.Date || new Date().toISOString().split('T')[0];
-    const vendor = row.vendor || row.Vendor || row.supplier || row.Supplier || '';
-    const category = row.category || row.Category || '';
-    const notes = row.notes || row.Notes || '';
+    const description = col(row, 'description', 'item', 'name');
+    const amount = parseMoney(col(row, 'amount', 'amount$', 'cost', 'total'));
+    const date = col(row, 'date') || new Date().toISOString().split('T')[0];
+    const vendor = col(row, 'vendor', 'supplier');
+    const category = col(row, 'category');
+    const notes = col(row, 'notes');
 
     if (!description || !amount) continue;
 
