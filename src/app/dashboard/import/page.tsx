@@ -5,7 +5,7 @@ import { useProjectId } from '@/lib/project-context';
 export default function ImportPage() {
   const projectId = useProjectId();
   const [file, setFile] = useState<File | null>(null);
-  const [result, setResult] = useState<{ imported?: number; error?: string } | null>(null);
+  const [result, setResult] = useState<{ imported?: number; skipped?: number; createdCategories?: string[]; error?: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleImport(e: React.FormEvent) {
@@ -40,7 +40,8 @@ export default function ImportPage() {
         </ol>
         <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
           <p className="font-medium">Expected columns (flexible matching):</p>
-          <p>description/item, amount/cost, date, category, vendor/supplier, notes</p>
+          <p>Date, Amount, Description, Category, Vendor, Source (Owner/Builder), Notes</p>
+          <p className="mt-1">Categories that don&apos;t exist yet are created. Rows already in the app are skipped, so re-importing the same sheet is safe.</p>
         </div>
       </div>
 
@@ -58,7 +59,12 @@ export default function ImportPage() {
 
       {result && (
         <div className={`rounded-xl p-4 ${result.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-          {result.error ? `Error: ${result.error}` : `✅ Successfully imported ${result.imported} expenses!`}
+          {result.error ? `Error: ${result.error}` : (
+            <>
+              <p>✅ Imported {result.imported} expenses{result.skipped ? `, skipped ${result.skipped} already in the app` : ''}.</p>
+              {!!result.createdCategories?.length && <p className="text-sm mt-1">New categories: {result.createdCategories.join(', ')}</p>}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -8,9 +8,19 @@ import { cookies } from 'next/headers';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
-  const { email, password, name } = await req.json();
+  const { email, password, name, inviteCode } = await req.json();
   if (!email || !password || !name) {
     return NextResponse.json({ error: 'All fields required' }, { status: 400 });
+  }
+
+  // The deployed app is on a public URL, so registration needs REGISTRATION_CODE.
+  // Without it set, registration is only open when running locally.
+  const requiredCode = process.env.REGISTRATION_CODE;
+  if (requiredCode ? inviteCode !== requiredCode : process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Registration requires a valid invite code' }, { status: 403 });
+  }
+  if (String(password).length < 8) {
+    return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
   }
 
   await initDb();

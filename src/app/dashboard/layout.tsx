@@ -7,6 +7,7 @@ import { ProjectContext } from '@/lib/project-context';
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/dashboard/expenses', label: 'Expenses', icon: '💰' },
+  { href: '/dashboard/budget', label: 'Budget', icon: '🎯' },
   { href: '/dashboard/progress', label: 'Progress', icon: '🏗️' },
   { href: '/dashboard/import', label: 'Import Data', icon: '📥' },
 ];
