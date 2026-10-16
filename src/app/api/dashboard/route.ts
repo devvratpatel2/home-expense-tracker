@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { getUserId, ownsProject } from '@/lib/auth';
+import { canViewProject, getUserId } from '@/lib/auth';
 import { findIssues } from '@/lib/insights';
 
 type Payer = 'Owner' | 'Builder' | 'Unassigned';
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const projectId = req.nextUrl.searchParams.get('projectId');
-  if (!(await ownsProject(userId, projectId))) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!(await canViewProject(userId, projectId))) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const db = getDb();
   const project = await db.execute({ sql: `SELECT name, budget FROM projects WHERE id = ?`, args: [projectId] });

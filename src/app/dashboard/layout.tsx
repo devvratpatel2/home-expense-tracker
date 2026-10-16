@@ -2,20 +2,24 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { ProjectContext } from '@/lib/project-context';
+import { CanEditContext, ProjectContext } from '@/lib/project-context';
 
+// People a project is shared with only get the pages that read.
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Overview' },
-  { href: '/dashboard/expenses', label: 'Expenses' },
-  { href: '/dashboard/budget', label: 'Budget' },
-  { href: '/dashboard/progress', label: 'Progress' },
-  { href: '/dashboard/import', label: 'Import' },
+  { href: '/dashboard', label: 'Overview', viewer: true },
+  { href: '/dashboard/expenses', label: 'Expenses', viewer: true },
+  { href: '/dashboard/budget', label: 'Budget', viewer: false },
+  { href: '/dashboard/progress', label: 'Progress', viewer: true },
+  { href: '/dashboard/import', label: 'Import', viewer: false },
+  { href: '/dashboard/share', label: 'Share', viewer: false },
 ];
+
+interface Project { id: string; name: string; role: 'owner' | 'viewer'; owner_name?: string }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<{ name: string } | null>(null);
   const [projectId, setProjectId] = useState('');
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [mobileNav, setMobileNav] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -38,6 +42,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/');
   }
 
+  const project = projects.find(p => p.id === projectId);
+  const canEdit = project?.role !== 'viewer';
+  const navItems = NAV_ITEMS.filter(item => canEdit || item.viewer);
+
+  useEffect(() => {
+    if (!canEdit && !NAV_ITEMS.some(item => item.viewer && item.href === pathname)) router.replace('/dashboard');
+  }, [canEdit, pathname, router]);
+
   if (!user) return <div className="min-h-screen grid place-items-center"><p className="font-display italic text-2xl text-ink-3">Opening the ledger…</p></div>;
 
   return (
@@ -57,12 +69,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <label className="block mb-8">
               <span className="eyebrow">Project</span>
               <select value={projectId} onChange={e => setProjectId(e.target.value)} className="field">
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projects.map(p => <option key={p.id} value={p.id}>{p.role === 'viewer' ? `${p.name} (${p.owner_name}'s)` : p.name}</option>)}
               </select>
             </label>
           )}
+          {!canEdit && (
+            <p className="mb-8 text-sm text-ink-2 leading-snug">
+              <span className="eyebrow block">Shared with you</span>
+              {project?.owner_name ? `${project.owner_name}'s build. ` : ''}You can look, not change.
+            </p>
+          )}
           <nav className="space-y-0.5" aria-label="Main">
-            {NAV_ITEMS.map((item, i) => {
+            {navItems.map((item, i) => {
               const active = pathname === item.href;
               return (
                 <Link key={item.href} href={item.href} onClick={() => setMobileNav(false)} aria-current={active ? 'page' : undefined}
@@ -84,9 +102,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <main className="min-w-0 px-5 sm:px-8 lg:px-14 py-8 lg:py-12">
         {projectId ? (
-          <ProjectContext.Provider value={projectId}>{children}</ProjectContext.Provider>
+          <ProjectContext.Provider value={projectId}>
+            <CanEditContext.Provider value={canEdit}>{children}</CanEditContext.Provider>
+          </ProjectContext.Provider>
         ) : (
-          <p className="font-display text-3xl text-ink-2">No project yet.</p>
+          <p className="font-display text-3xl text-ink-2 max-w-lg">Nothing shared with you yet. Ask the owner to add your email on their Share page.</p>
         )}
       </main>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useProjectId } from '@/lib/project-context';
+import { useCanEdit, useProjectId } from '@/lib/project-context';
 import { CONSTRUCTION_PHASES } from '@/lib/constants';
 import { uploadFile } from '@/lib/upload-client';
 import { longDate } from '@/lib/format';
@@ -16,6 +16,7 @@ const blank = () => ({ title: '', description: '', phase: '', status: 'in_progre
 
 export default function ProgressPage() {
   const projectId = useProjectId();
+  const canEdit = useCanEdit();
   const [updates, setUpdates] = useState<ProgressUpdate[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(blank);
@@ -83,9 +84,11 @@ export default function ProgressPage() {
       </aside>
 
       <div className="lg:col-span-8 lg:pt-28">
-        <div className="reveal flex justify-end" style={at(1)}>
-          <button onClick={() => setShowForm(!showForm)} className={showForm ? 'btn-ink' : 'btn-accent'}>{showForm ? 'Close' : 'Post an update'}</button>
-        </div>
+        {canEdit && (
+          <div className="reveal flex justify-end" style={at(1)}>
+            <button onClick={() => setShowForm(!showForm)} className={showForm ? 'btn-ink' : 'btn-accent'}>{showForm ? 'Close' : 'Post an update'}</button>
+          </div>
+        )}
 
         {showForm && (
           <form onSubmit={handleSubmit} className="mt-6 bg-sand rounded-sm p-6 grid sm:grid-cols-2 gap-x-6 gap-y-5">
@@ -146,7 +149,7 @@ export default function ProgressPage() {
           ))}
         </ol>
         {updates.length === 0 && !showForm && (
-          <p className="mt-10 font-display italic text-3xl text-ink-3 max-w-md">No updates yet. Post the first photo from site.</p>
+          <p className="mt-10 font-display italic text-3xl text-ink-3 max-w-md">{canEdit ? 'No updates yet. Post the first photo from site.' : 'No updates posted yet.'}</p>
         )}
       </div>
     </div>

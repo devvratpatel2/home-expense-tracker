@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { useProjectId } from '@/lib/project-context';
+import { useCanEdit, useProjectId } from '@/lib/project-context';
 import { PAID_BY, PAYMENT_METHODS } from '@/lib/constants';
 import { uploadFile as uploadReceipt } from '@/lib/upload-client';
 import { money, longDate } from '@/lib/format';
@@ -28,6 +28,7 @@ function blankForm(): Form {
 
 export default function ExpensesPage() {
   const projectId = useProjectId();
+  const canEdit = useCanEdit();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -122,6 +123,7 @@ export default function ExpensesPage() {
   }
 
   function startEdit(exp: Expense) {
+    if (!canEdit) return;
     setEditId(exp.id);
     setEdit({ ...exp });
     setEditReceipt(null);
@@ -207,7 +209,7 @@ export default function ExpensesPage() {
           </p>
           <div className="flex gap-2">
             <button onClick={exportCsv} className="btn-quiet">Export CSV</button>
-            <button onClick={() => setShowForm(!showForm)} className={showForm ? 'btn-ink' : 'btn-accent'}>{showForm ? 'Close' : 'Add a payment'}</button>
+            {canEdit && <button onClick={() => setShowForm(!showForm)} className={showForm ? 'btn-ink' : 'btn-accent'}>{showForm ? 'Close' : 'Add a payment'}</button>}
           </div>
         </div>
       </header>
@@ -344,7 +346,7 @@ export default function ExpensesPage() {
             {visible.map(exp => editId === exp.id ? (
               <tr key={exp.id}><td colSpan={6} className="!p-0">{editor}</td></tr>
             ) : (
-              <tr key={exp.id} onClick={() => startEdit(exp)} className="cursor-pointer hover:bg-sand/50 transition-colors">
+              <tr key={exp.id} onClick={() => startEdit(exp)} className={canEdit ? 'cursor-pointer hover:bg-sand/50 transition-colors' : ''}>
                 <td className="whitespace-nowrap text-ink-3 num">{longDate(exp.date)}</td>
                 <td className="max-w-md">
                   <span>{exp.description}</span>
@@ -366,29 +368,42 @@ export default function ExpensesPage() {
       <ul className="reveal md:hidden mt-6 divide-y divide-ink/10" style={at(2)}>
         {visible.map(exp => (
           <li key={exp.id}>
-            {editId === exp.id ? editor : (
+            {editId === exp.id ? editor : canEdit ? (
               <button onClick={() => startEdit(exp)} className="w-full text-left py-4 flex gap-4">
-                <span className="flex-1 min-w-0">
-                  <span className="block">{exp.description}</span>
-                  <span className="block text-xs text-ink-3 mt-1">{longDate(exp.date)} · {exp.category_name || 'Uncategorized'}{exp.vendor && ` · ${exp.vendor}`}</span>
-                </span>
-                <span className="text-right">
-                  <span className="block num font-medium">{money(Number(exp.amount), true)}</span>
-                  <Payer value={exp.paid_by} />
-                </span>
+                <PhoneRow exp={exp} />
               </button>
+            ) : (
+              <div className="py-4 flex gap-4">
+                <PhoneRow exp={exp} />
+              </div>
             )}
+            {!canEdit && exp.receipt_path && <a href={exp.receipt_path} target="_blank" rel="noreferrer" className="-mt-2 mb-3 inline-block text-xs text-accent underline underline-offset-2">Open receipt</a>}
           </li>
         ))}
       </ul>
 
       {visible.length === 0 && (
         <p className="mt-10 font-display italic text-2xl text-ink-3">
-          {expenses.length ? 'Nothing matches these filters.' : 'No payments yet. Add one, or import your sheet.'}
+          {expenses.length ? 'Nothing matches these filters.' : canEdit ? 'No payments yet. Add one, or import your sheet.' : 'No payments yet.'}
         </p>
       )}
-      {visible.length > 0 && <p className="mt-6 text-xs text-ink-3">Click a row to edit it.</p>}
+      {visible.length > 0 && canEdit && <p className="mt-6 text-xs text-ink-3">Click a row to edit it.</p>}
     </div>
+  );
+}
+
+function PhoneRow({ exp }: { exp: Expense }) {
+  return (
+    <>
+      <span className="flex-1 min-w-0">
+        <span className="block">{exp.description}</span>
+        <span className="block text-xs text-ink-3 mt-1">{longDate(exp.date)} · {exp.category_name || 'Uncategorized'}{exp.vendor && ` · ${exp.vendor}`}</span>
+      </span>
+      <span className="text-right">
+        <span className="block num font-medium">{money(Number(exp.amount), true)}</span>
+        <Payer value={exp.paid_by} />
+      </span>
+    </>
   );
 }
 

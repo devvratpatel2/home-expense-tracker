@@ -74,7 +74,7 @@ export default function Home() {
             {!isLogin && (
               <label className="block">
                 <span className="eyebrow">Invite code</span>
-                <input type="text" value={inviteCode} onChange={e => setInviteCode(e.target.value)} placeholder="Not needed for the first account" className="field" />
+                <input type="text" value={inviteCode} onChange={e => setInviteCode(e.target.value)} placeholder="Not needed if you were invited" className="field" />
               </label>
             )}
             {error && <p role="alert" className="text-sm text-accent-deep">{error}</p>}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, toIsoDate } from '@/lib/db';
-import { getUserId, ownsProject, projectOf } from '@/lib/auth';
+import { canViewProject, getUserId, ownsProject, projectOf } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   if (!userId) return unauthorized();
 
   const projectId = req.nextUrl.searchParams.get('projectId');
-  if (!(await ownsProject(userId, projectId))) return notFound();
+  if (!(await canViewProject(userId, projectId))) return notFound();
 
   const result = await getDb().execute({
     sql: `SELECT e.*, c.name as category_name FROM expenses e

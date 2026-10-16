@@ -10,8 +10,18 @@ export async function GET() {
   if (!userId) return unauthorized();
 
   await initDb();
-  const result = await getDb().execute({ sql: `SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC`, args: [userId] });
-  return NextResponse.json(result.rows);
+  const db = getDb();
+  const owned = await db.execute({ sql: `SELECT *, 'owner' AS role FROM projects WHERE user_id = ? ORDER BY created_at DESC`, args: [userId] });
+  // Shared projects leave out the saved sheet links; those stay with the owner.
+  const shared = await db.execute({
+    sql: `SELECT p.id, p.name, p.budget, 'viewer' AS role, o.name AS owner_name FROM projects p
+      JOIN project_viewers v ON v.project_id = p.id
+      JOIN users u ON lower(u.email) = v.email
+      JOIN users o ON o.id = p.user_id
+      WHERE u.id = ? AND p.user_id != ? ORDER BY v.created_at DESC`,
+    args: [userId, userId],
+  });
+  return NextResponse.json([...owned.rows, ...shared.rows]);
 }
 
 export async function POST(req: NextRequest) {

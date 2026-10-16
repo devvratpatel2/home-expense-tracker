@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useProjectId } from '@/lib/project-context';
+import { useCanEdit, useProjectId } from '@/lib/project-context';
 import { money, shortMoney, pct, monthLabel, longDate } from '@/lib/format';
 import { at } from '@/lib/reveal';
 import type { Issue } from '@/lib/insights';
@@ -34,6 +34,7 @@ const tooltipStyle = { background: INK, border: 'none', borderRadius: 4, color: 
 
 export default function DashboardPage() {
   const projectId = useProjectId();
+  const canEdit = useCanEdit();
   const [data, setData] = useState<DashboardData | null>(null);
   const [allCategories, setAllCategories] = useState(false);
 
@@ -50,9 +51,9 @@ export default function DashboardPage() {
         <h1 className="reveal font-display text-6xl lg:text-7xl leading-[0.95]" style={at(0)}>
           Nothing in the <span className="italic">ledger</span> yet.
         </h1>
-        <p className="reveal mt-6 text-ink-2 max-w-md" style={at(1)}>
+        {canEdit && <p className="reveal mt-6 text-ink-2 max-w-md" style={at(1)}>
           Bring your sheet in from the <Link href="/dashboard/import" className="text-accent underline underline-offset-4">Import</Link> page, or start adding payments on <Link href="/dashboard/expenses" className="text-accent underline underline-offset-4">Expenses</Link>.
-        </p>
+        </p>}
       </div>
     );
   }
@@ -107,7 +108,7 @@ export default function DashboardPage() {
                 </div>
               )}
             </>
-          ) : (
+          ) : canEdit && (
             <p className="mt-5 text-ink-2">
               No budget yet. <Link href="/dashboard/budget" className="text-accent underline underline-offset-4">Set one</Link> or import the builder&apos;s quote sheet.
             </p>
@@ -208,7 +209,7 @@ export default function DashboardPage() {
         <section className="reveal lg:col-span-7 lg:row-span-2" style={at(5)}>
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-display text-3xl">Where it went</h2>
-            <Link href="/dashboard/budget" className="text-sm text-ink-3 hover:text-accent">Category budgets →</Link>
+            {canEdit && <Link href="/dashboard/budget" className="text-sm text-ink-3 hover:text-accent">Category budgets →</Link>}
           </div>
           <ul className="mt-6 space-y-3.5">
             {categories.map(c => {

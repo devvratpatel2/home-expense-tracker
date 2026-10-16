@@ -90,6 +90,21 @@ async function setupSchema() {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS project_viewers (
+      project_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (project_id, email),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+    CREATE TABLE IF NOT EXISTS share_links (
+      project_id TEXT PRIMARY KEY,
+      token TEXT UNIQUE NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT,
+      last_opened_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
   `);
 
   // Databases created by older versions are missing these columns.

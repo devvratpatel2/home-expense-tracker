@@ -15,6 +15,19 @@ export async function ownsProject(userId: string, projectId: string | null) {
   return result.rows.length > 0;
 }
 
+// The owner, or someone the owner shared the project with. Viewers can read but never write,
+// so every write route keeps using ownsProject.
+export async function canViewProject(userId: string, projectId: string | null) {
+  if (!projectId) return false;
+  await initDb();
+  const result = await getDb().execute({
+    sql: `SELECT 1 FROM projects p WHERE p.id = ? AND (p.user_id = ? OR EXISTS (
+      SELECT 1 FROM project_viewers v JOIN users u ON lower(u.email) = v.email WHERE v.project_id = p.id AND u.id = ?))`,
+    args: [projectId, userId, userId],
+  });
+  return result.rows.length > 0;
+}
+
 // Looks up the project a row belongs to, so edits and deletes by id can be ownership-checked.
 export async function projectOf(table: 'expenses' | 'categories' | 'progress_updates', id: string | null) {
   if (!id) return null;

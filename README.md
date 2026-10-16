@@ -131,6 +131,13 @@ The importer is flexible and will try to match your columns automatically:
 
 If your spreadsheet uses different column names, just rename the header row in the CSV before importing.
 
+### 👀 Share
+
+Two read-only ways to let someone follow along, both on the **Share** page:
+
+- **A link to the expenses.** Pick how long it lasts (7 days, 30 days or no expiry), click **Create a link**, then **Copy link**. Anyone with it sees the list of payments (date, description, category, vendor, who paid, amount) with no login, and nothing else: no receipts, notes, budget or photos. The page shows when it was last opened. **Make a new link** replaces it and **Turn it off** kills it, both straight away.
+- **A login.** Add their email, then **Copy message** and send it. They create an account with that email (no invite code needed) and see the Overview, Expenses with receipts, and Progress. They can't add, edit or delete anything, and they don't see Budget, Import, Share or your sheet links. **Remove** takes their access away straight away.
+
 ---
 
 ## Where Is My Data Stored?
