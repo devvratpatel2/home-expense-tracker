@@ -131,6 +131,24 @@ The importer is flexible and will try to match your columns automatically:
 
 If your spreadsheet uses different column names, just rename the header row in the CSV before importing.
 
+### 🔁 Two-way sync with a Google Sheet
+
+Connect a sheet once and it stays in step with the site: adding, editing or deleting a payment on the site writes to the sheet first (if Google can't be reached, the site doesn't save either), and edits made in the sheet show up on the site within 30 seconds of opening it. Renaming or deleting a category updates the sheet's Category column too. Budgets, receipts and progress photos stay on the site only.
+
+**Setup (once per sheet):**
+1. In the sheet: **Extensions → Apps Script**, replace the code with `apps-script/Code.gs`, and save.
+2. **Project Settings → Script properties**: add `SECRET` with a long random value (16+ characters).
+3. **Deploy → New deployment → Web app**, Execute as **Me**, Who has access **Anyone**, then **Deploy** and authorize. The script only asks for access to that one spreadsheet.
+4. On the site's **Import** page, paste the web app URL and the secret under **Two-way sync** and click **Connect the sheet**.
+
+The web app is reachable by anyone who has the URL, but it refuses every request without the secret. The secret is stored on the server and never sent to the browser.
+
+On connect, each sheet row is matched to the site's copy (by date, amount and description) and given that row's id in column **I** (`ID`). Don't edit that column: it's how a row is found again after sorting. New rows typed in the sheet get an id automatically. If a sync would delete more than 20% of the payments, it stops and keeps them, since that's more likely a sheet mistake.
+
+While a sheet is connected, the CSV and link import for expenses is turned off (the sheet is already the source). The builder's quote import still works.
+
+To change the script later, paste the new code, then **Deploy → Manage deployments → Edit → New version** so the URL stays the same.
+
 ### 👀 Share
 
 Two read-only ways to let someone follow along, both on the **Share** page:

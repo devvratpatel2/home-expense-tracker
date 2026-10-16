@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, toIsoDate } from '@/lib/db';
 import { canViewProject, getUserId, ownsProject, projectOf } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
+import { maybePull, pushDelete, pushExpense, SheetSyncError } from '@/lib/sheet-sync';
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 const notFound = () => NextResponse.json({ error: 'Not found' }, { status: 404 });
+const sheetFailed = (e: unknown) => {
+  if (e instanceof SheetSyncError) return NextResponse.json({ error: e.message }, { status: 502 });
+  throw e;
+};
 
 function cleanFields(body: Record<string, unknown>) {
   return {
@@ -26,6 +31,7 @@ export async function GET(req: NextRequest) {
 
   const projectId = req.nextUrl.searchParams.get('projectId');
   if (!(await canViewProject(userId, projectId))) return notFound();
+  await maybePull(projectId!);
 
   const result = await getDb().execute({
     sql: `SELECT e.*, c.name as category_name FROM expenses e
@@ -47,6 +53,11 @@ export async function POST(req: NextRequest) {
   if (!f.description || !Number.isFinite(f.amount) || !f.date) return NextResponse.json({ error: 'Description, amount and a valid date are required' }, { status: 400 });
 
   const id = uuid();
+  try {
+    await pushExpense(body.project_id, id, f);
+  } catch (e) {
+    return sheetFailed(e);
+  }
   await getDb().execute({
     sql: `INSERT INTO expenses (id, project_id, category_id, description, amount, date, vendor, payment_method, paid_by, notes, receipt_path)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -66,6 +77,12 @@ export async function PUT(req: NextRequest) {
   const f = cleanFields(body);
   if (!f.description || !Number.isFinite(f.amount) || !f.date) return NextResponse.json({ error: 'Description, amount and a valid date are required' }, { status: 400 });
 
+  const current = await getDb().execute({ sql: `SELECT allocations FROM expenses WHERE id = ?`, args: [body.id] });
+  try {
+    await pushExpense(projectId!, body.id, { ...f, allocations: current.rows[0]?.allocations as string | null });
+  } catch (e) {
+    return sheetFailed(e);
+  }
   await getDb().execute({
     sql: `UPDATE expenses SET category_id = ?, description = ?, amount = ?, date = ?, vendor = ?,
       payment_method = ?, paid_by = ?, notes = ?, receipt_path = ? WHERE id = ?`,
@@ -82,6 +99,14 @@ export async function DELETE(req: NextRequest) {
   const projectId = await projectOf('expenses', id);
   if (!(await ownsProject(userId, projectId))) return notFound();
 
+  try {
+    await pushDelete(projectId!, id!);
+  } catch (e) {
+    return sheetFailed(e);
+  }
   await getDb().execute({ sql: `DELETE FROM expenses WHERE id = ?`, args: [id] });
   return NextResponse.json({ success: true });
 }
+
+// Google Sheets calls can take a few seconds each.
+export const maxDuration = 60;

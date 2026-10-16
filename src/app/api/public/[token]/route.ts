@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, initDb } from '@/lib/db';
+import { maybePull } from '@/lib/sheet-sync';
 
 const headers = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' };
 
@@ -19,6 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
   if (!row || (row.expires_at && new Date(row.expires_at as string) < new Date())) return notFound();
 
   await db.execute({ sql: `UPDATE share_links SET last_opened_at = datetime('now') WHERE token = ?`, args: [params.token] });
+  await maybePull(row.project_id as string);
 
   const expenses = await db.execute({
     sql: `SELECT e.date, e.description, e.amount, e.vendor, e.paid_by, c.name AS category
@@ -41,3 +43,6 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     })),
   }, { headers });
 }
+
+// Google Sheets calls can take a few seconds each.
+export const maxDuration = 60;

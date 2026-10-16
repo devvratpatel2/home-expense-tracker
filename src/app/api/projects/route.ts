@@ -11,7 +11,13 @@ export async function GET() {
 
   await initDb();
   const db = getDb();
-  const owned = await db.execute({ sql: `SELECT *, 'owner' AS role FROM projects WHERE user_id = ? ORDER BY created_at DESC`, args: [userId] });
+  // The sheet sync secret never leaves the server.
+  const owned = await db.execute({
+    sql: `SELECT id, user_id, name, description, budget, start_date, status, created_at, sheet_url, budget_sheet_url,
+      sheet_sync_url, sheet_pulled_at, sheet_sync_error, 'owner' AS role
+      FROM projects WHERE user_id = ? ORDER BY created_at DESC`,
+    args: [userId],
+  });
   // Shared projects leave out the saved sheet links; those stay with the owner.
   const shared = await db.execute({
     sql: `SELECT p.id, p.name, p.budget, 'viewer' AS role, o.name AS owner_name FROM projects p

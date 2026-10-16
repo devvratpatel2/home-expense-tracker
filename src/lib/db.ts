@@ -112,6 +112,10 @@ async function setupSchema() {
   await addColumn('expenses', 'allocations', 'TEXT');
   await addColumn('projects', 'sheet_url', 'TEXT');
   await addColumn('projects', 'budget_sheet_url', 'TEXT');
+  await addColumn('projects', 'sheet_sync_url', 'TEXT');
+  await addColumn('projects', 'sheet_sync_secret', 'TEXT');
+  await addColumn('projects', 'sheet_pulled_at', 'TEXT');
+  await addColumn('projects', 'sheet_sync_error', 'TEXT');
 
   // Older imports stored sheet dates as M/D/YYYY, which breaks month grouping. Dates that
   // can't be read are left exactly as they are.

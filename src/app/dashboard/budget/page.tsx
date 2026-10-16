@@ -38,7 +38,8 @@ export default function BudgetPage() {
   }
 
   async function saveCategory(id: string, fields: Partial<Category>) {
-    await fetch('/api/categories', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...fields }) });
+    const res = await fetch('/api/categories', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...fields }) });
+    if (!res.ok) alert((await res.json().catch(() => ({}))).error || 'Save failed');
     load();
   }
 
@@ -53,7 +54,8 @@ export default function BudgetPage() {
   async function deleteCategory(c: Category) {
     const msg = c.expense_count > 0 ? `Delete "${c.name}"? Its ${c.expense_count} expenses will become Uncategorized.` : `Delete "${c.name}"?`;
     if (!confirm(msg)) return;
-    await fetch(`/api/categories?id=${c.id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/categories?id=${c.id}`, { method: 'DELETE' });
+    if (!res.ok) alert((await res.json().catch(() => ({}))).error || 'Delete failed');
     load();
   }
 

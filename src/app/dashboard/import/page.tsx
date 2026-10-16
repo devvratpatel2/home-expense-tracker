@@ -10,7 +10,92 @@ interface Result {
   imported?: number; skipped?: number; filled?: number; badDates?: number;
   budgetLines?: number; total?: number; createdCategories?: string[];
 }
-interface Project { id: string; sheet_url?: string; budget_sheet_url?: string }
+interface Project { id: string; sheet_url?: string; budget_sheet_url?: string; sheet_sync_url?: string; sheet_pulled_at?: string; sheet_sync_error?: string }
+interface SyncResult { error?: string; matched?: number; addedToSheet?: number; added?: number; updated?: number; removed?: number; warning?: string | null; success?: boolean }
+
+function SheetSync({ project, onChange }: { project: Project; onChange: () => void }) {
+  const [url, setUrl] = useState('');
+  const [secret, setSecret] = useState('');
+  const [busy, setBusy] = useState('');
+  const [result, setResult] = useState<SyncResult | null>(null);
+  const connected = !!project.sheet_sync_url;
+
+  async function send(label: string, request: () => Promise<Response>) {
+    setBusy(label);
+    setResult(null);
+    try {
+      const res = await request();
+      setResult(await res.json());
+      onChange();
+    } catch {
+      setResult({ error: 'Couldn’t reach the site. Check your connection.' });
+    } finally {
+      setBusy('');
+    }
+  }
+
+  const post = (body: object) => () => fetch('/api/sheet-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, ...body }) });
+
+  return (
+    <section className="reveal mt-12 bg-ink text-paper rounded-sm p-6 lg:p-10 grid lg:grid-cols-12 gap-8" style={at(1)}>
+      <div className="lg:col-span-5">
+        <p className="eyebrow text-paper/60">Two-way sync</p>
+        <h2 className="font-display text-4xl mt-2">{connected ? 'Your Google Sheet is connected' : 'Keep a Google Sheet in sync'}</h2>
+        <p className="mt-4 text-paper/70 text-sm max-w-md">
+          {connected
+            ? 'Every payment you add, edit or delete here is written to the sheet first. Edits made in the sheet show up here within 30 seconds of opening the site.'
+            : 'Connect the Apps Script web app in your sheet and every change here is written to the sheet, and changes in the sheet come back here.'}
+        </p>
+        {connected && project.sheet_pulled_at && (
+          <p className="mt-4 text-xs text-paper/50">Last read from the sheet {new Date(project.sheet_pulled_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}.</p>
+        )}
+        {connected && project.sheet_sync_error && <p className="mt-3 text-sm text-accent-soft">{project.sheet_sync_error}</p>}
+      </div>
+
+      <div className="lg:col-span-7">
+        {connected ? (
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="btn-accent" disabled={!!busy} onClick={() => send('pull', post({}))}>
+              {busy === 'pull' ? 'Reading the sheet…' : 'Sync now'}
+            </button>
+            <button type="button" className="btn px-4 text-paper/70 hover:text-paper hover:bg-paper/10" disabled={!!busy}
+              onClick={() => { if (confirm('Stop syncing with the sheet? Nothing is deleted in either place.')) send('off', () => fetch(`/api/sheet-sync?projectId=${project.id}`, { method: 'DELETE' })); }}>
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={e => { e.preventDefault(); send('connect', post({ url, secret })); }} className="space-y-6">
+            <label className="block">
+              <span className="eyebrow text-paper/60">Web app URL</span>
+              <input value={url} onChange={e => setUrl(e.target.value)} required placeholder="https://script.google.com/macros/s/…/exec"
+                className="field text-paper border-paper/30 placeholder:text-paper/40" />
+            </label>
+            <label className="block">
+              <span className="eyebrow text-paper/60">Secret</span>
+              <input type="password" value={secret} onChange={e => setSecret(e.target.value)} required minLength={16} autoComplete="off"
+                className="field text-paper border-paper/30" />
+            </label>
+            <p className="text-xs text-paper/50">The same value as the SECRET script property. It stays on the server and is never shown again.</p>
+            <button type="submit" className="btn-accent" disabled={!!busy}>{busy === 'connect' ? 'Connecting…' : 'Connect the sheet'}</button>
+          </form>
+        )}
+        {result && (
+          <div role="status" className="mt-6 text-sm">
+            {result.error ? <p className="text-accent-soft">{result.error}</p> : (
+              <ul className="space-y-1 text-paper/80">
+                {result.matched !== undefined && <li>{result.matched} payments matched to their sheet rows.</li>}
+                {!!result.addedToSheet && <li>{result.addedToSheet} payments that were only here were added to the sheet.</li>}
+                {result.added !== undefined && <li>{result.added} new from the sheet, {result.updated} updated, {result.removed} removed.</li>}
+                {result.warning && <li className="text-accent-soft">{result.warning}</li>}
+                {result.success && <li>Disconnected. The sheet and the site keep what they have.</li>}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export default function ImportPage() {
   const projectId = useProjectId();
@@ -69,9 +154,13 @@ export default function ImportPage() {
         <p className="eyebrow">Bring it in</p>
         <h1 className="font-display text-6xl lg:text-7xl leading-none mt-2">Import</h1>
         <p className="mt-4 max-w-xl text-ink-2">
-          The app only reads your sheet. It never writes to it. Anything already in the ledger is matched and skipped, so you can run this as often as you like.
+          {project?.sheet_sync_url
+            ? 'Payments sync with your Google Sheet on their own. Use this page for the builder’s quote.'
+            : 'Importing only reads the sheet. Anything already in the ledger is matched and skipped, so you can run it as often as you like.'}
         </p>
       </header>
+
+      {project && <SheetSync project={project} onChange={loadProject} />}
 
       <div className="mt-12 grid lg:grid-cols-12 gap-x-12 gap-y-10">
         <form onSubmit={importLink} className="reveal lg:col-span-7" style={at(1)}>

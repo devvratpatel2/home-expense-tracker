@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { canViewProject, getUserId } from '@/lib/auth';
 import { findIssues } from '@/lib/insights';
+import { maybePull } from '@/lib/sheet-sync';
 
 type Payer = 'Owner' | 'Builder' | 'Unassigned';
 
@@ -11,6 +12,7 @@ export async function GET(req: NextRequest) {
 
   const projectId = req.nextUrl.searchParams.get('projectId');
   if (!(await canViewProject(userId, projectId))) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  await maybePull(projectId!);
 
   const db = getDb();
   const project = await db.execute({ sql: `SELECT name, budget FROM projects WHERE id = ?`, args: [projectId] });
@@ -135,3 +137,6 @@ function parseAllocations(raw: string | null): Record<string, number> | null {
     return null;
   }
 }
+
+// Google Sheets calls can take a few seconds each.
+export const maxDuration = 60;

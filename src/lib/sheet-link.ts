@@ -1,4 +1,5 @@
-// Reads a Google Sheet through its public CSV export. Read-only: the app never writes to the sheet.
+// Reads a Google Sheet through its public CSV export for a one-off import. Writing back to a
+// sheet goes through lib/sheet-sync.ts instead.
 // Only docs.google.com is ever fetched, built from the parsed id, so a pasted URL can't point the
 // server at anything else.
 

@@ -6,6 +6,7 @@ import { v4 as uuid } from 'uuid';
 import { parse } from 'csv-parse/sync';
 import { fetchSheetCsv, SheetAccessError } from '@/lib/sheet-link';
 import { isBudgetHeaderRow, normalizeBudgetCategory } from '@/lib/smart/budget-names';
+import { syncConfig } from '@/lib/sheet-sync';
 
 type Kind = 'expenses' | 'budget';
 
@@ -44,6 +45,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // With the sheet connected, rows imported only here would be dropped by the next pull.
+    if (kind === 'expenses' && (await syncConfig(projectId))) {
+      return fail('Your Google Sheet is connected and syncs on its own, so there’s nothing to import. Add payments in the sheet or on the Expenses page.');
+    }
     const result = kind === 'budget' ? await importBudget(projectId, text) : await importExpenses(projectId, text);
     if (sheetUrl) {
       const column = kind === 'budget' ? 'budget_sheet_url' : 'sheet_url';

@@ -153,7 +153,8 @@ export default function ExpensesPage() {
 
   async function deleteExpense(id: string) {
     if (!confirm('Delete this expense?')) return;
-    await fetch(`/api/expenses?id=${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/expenses?id=${id}`, { method: 'DELETE' });
+    if (!res.ok) { alert((await res.json().catch(() => ({}))).error || 'Delete failed'); return; }
     setEditId(null);
     load();
   }
