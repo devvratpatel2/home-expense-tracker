@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
-    "@vercel/blob": "2.8.2",
     "bcryptjs": "^3.0.3",
     "csv-parse": "^6.2.1",
     "iron-session": "^8.0.4",

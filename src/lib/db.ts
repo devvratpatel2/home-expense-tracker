@@ -1,4 +1,6 @@
 import { createClient, type Client } from '@libsql/client';
+import fs from 'fs';
+import path from 'path';
 
 let client: Client | null = null;
 let ready: Promise<void> | null = null;
@@ -6,8 +8,11 @@ let ready: Promise<void> | null = null;
 export function getDb(): Client {
   if (client) return client;
 
+  const url = process.env.TURSO_DATABASE_URL || 'file:data/tracker.db';
+  if (url.startsWith('file:')) fs.mkdirSync(path.dirname(url.slice(5)), { recursive: true });
+
   client = createClient({
-    url: process.env.TURSO_DATABASE_URL || 'file:data/tracker.db',
+    url,
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
 
@@ -76,6 +81,14 @@ async function setupSchema() {
       date TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+    CREATE TABLE IF NOT EXISTS files (
+      key TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      data BLOB NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
 

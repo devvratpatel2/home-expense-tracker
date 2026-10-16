@@ -13,18 +13,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'All fields required' }, { status: 400 });
   }
 
-  // The deployed app is on a public URL, so registration needs REGISTRATION_CODE.
-  // Without it set, registration is only open when running locally.
-  const requiredCode = process.env.REGISTRATION_CODE;
-  if (requiredCode ? inviteCode !== requiredCode : process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'Registration requires a valid invite code' }, { status: 403 });
-  }
   if (String(password).length < 8) {
     return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
   }
 
   await initDb();
   const db = getDb();
+
+  // The site is on a public URL. The first account can always be created; after that,
+  // registering needs REGISTRATION_CODE (or, with no code set, is only open when running locally).
+  const userCount = Number((await db.execute(`SELECT COUNT(*) as n FROM users`)).rows[0].n);
+  const requiredCode = process.env.REGISTRATION_CODE;
+  const allowed = userCount === 0 || (requiredCode ? inviteCode === requiredCode : process.env.NODE_ENV !== 'production');
+  if (!allowed) {
+    return NextResponse.json({ error: 'Registration is closed. Ask the owner for an invite code.' }, { status: 403 });
+  }
+
   const existing = await db.execute({ sql: `SELECT id FROM users WHERE email = ?`, args: [email] });
   if (existing.rows.length) {
     return NextResponse.json({ error: 'Email already registered' }, { status: 400 });

@@ -25,7 +25,7 @@ That's it. No database server to install, no cloud accounts to set up. Everythin
 ## First Time Setup
 
 1. Open the app and click **Register**
-2. Enter your name, email, a password (8+ characters), and the invite code (`REGISTRATION_CODE`; not needed when running locally without one)
+2. Enter your name, email and a password (8+ characters). The first account needs no invite code; later accounts need `REGISTRATION_CODE`
 3. You'll be taken to the dashboard with a default project ("My Home Build") already created
 4. 17 common construction categories are pre-loaded for you:
    - Foundation & Excavation, Framing, Roofing, Plumbing, Electrical, HVAC, Insulation, Drywall & Painting, Flooring, Windows & Doors, Kitchen & Cabinets, Bathrooms, Exterior & Landscaping, Permits & Fees, Contractor Labor, Materials, Miscellaneous
@@ -140,11 +140,11 @@ Running locally, everything stays on your computer:
 | What | Where |
 |---|---|
 | Database | `data/tracker.db` (SQLite file) |
-| Uploaded receipts/photos | `data/uploads/` |
+| Uploaded receipts/photos | Same database, `files` table |
 
-**To back up your data:** just copy the `data/` folder somewhere safe.
+**To back up your data:** just copy `data/tracker.db` somewhere safe.
 
-On Vercel the database is Turso (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`) and receipts go to a private Vercel Blob store (`BLOB_READ_WRITE_TOKEN`). Receipts are only served through `/api/files/...` to the user who uploaded them.
+On Vercel the database is Turso (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`). Receipts live in the database too, and are only served through `/api/files/...` to the user who uploaded them. Photos are shrunk in the browser before upload; files over 4 MB are rejected.
 
 **To start fresh:** delete the `data/tracker.db` file and restart the app.
 
@@ -177,13 +177,13 @@ home-expense-tracker/
 │   ├── lib/
 │   │   ├── db.ts                       # Database setup and migrations
 │   │   ├── auth.ts                     # Session user and project ownership checks
+│   │   ├── upload-client.ts            # Shrinks photos and uploads them
 │   │   ├── session.ts                  # Auth session config
 │   │   ├── constants.ts                # Categories, phases, payment methods
 │   │   └── project-context.tsx         # React context for active project
 │   └── types/
 │       └── sql.js.d.ts                 # TypeScript types for sql.js
-├── data/                               # SQLite database (auto-created)
-    └── uploads/                        # Receipts when running locally
+└── data/                               # SQLite database (auto-created)
 ```
 
 ---
@@ -216,7 +216,6 @@ Passwords are hashed with bcrypt and sessions use encrypted cookies. Every API c
 - **TypeScript** — type safety
 - **Tailwind CSS** — styling
 - **libSQL / Turso** — SQLite locally, Turso when deployed
-- **Vercel Blob** — private receipt storage when deployed
 - **Recharts** — charts and visualizations
 - **iron-session** — encrypted cookie sessions
 - **bcryptjs** — password hashing
@@ -229,11 +228,10 @@ Passwords are hashed with bcrypt and sessions use encrypted cookies. Every API c
 To make this available to friends/family building their own homes:
 
 1. Deploy to [Vercel](https://vercel.com) (free tier works)
-2. Set these environment variables:
-   - `SESSION_SECRET` — random 32+ character string
-   - `REGISTRATION_CODE` — invite code people need to register
-   - `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` — hosted database
-   - `BLOB_READ_WRITE_TOKEN` — added automatically when you connect a Blob store under Storage in the Vercel project
+2. Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` for the hosted database. That's all that's required.
+3. Optional:
+   - `REGISTRATION_CODE` — lets more people register after the first account
+   - `SESSION_SECRET` — cookie secret; without it one is derived from `TURSO_AUTH_TOKEN`
 
 ---
 

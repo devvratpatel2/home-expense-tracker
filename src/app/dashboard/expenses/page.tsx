@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useProjectId } from '@/lib/project-context';
 import { PAID_BY, PAYMENT_METHODS } from '@/lib/constants';
+import { uploadFile as uploadReceipt } from '@/lib/upload-client';
 
 interface Expense {
   id: string; description: string; amount: number; date: string;
@@ -20,15 +21,6 @@ function blankForm() {
   // Remember the last category, vendor and payer so repeat entries are quick.
   const last = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('lastExpense') || '{}') : {};
   return { description: '', amount: '', date: today(), category_id: last.category_id || '', vendor: last.vendor || '', payment_method: last.payment_method || '', paid_by: last.paid_by || '', notes: '' };
-}
-
-async function uploadReceipt(file: File) {
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch('/api/upload', { method: 'POST', body: fd });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Upload failed');
-  return data.path as string;
 }
 
 export default function ExpensesPage() {

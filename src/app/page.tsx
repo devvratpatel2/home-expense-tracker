@@ -51,7 +51,7 @@ export default function Home() {
             <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
             {!isLogin && (
-              <input type="text" placeholder="Invite code" value={inviteCode} onChange={e => setInviteCode(e.target.value)}
+              <input type="text" placeholder="Invite code (not needed for the first account)" value={inviteCode} onChange={e => setInviteCode(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
             )}
             {error && <p className="text-red-500 text-sm">{error}</p>}

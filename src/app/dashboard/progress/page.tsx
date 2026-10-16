@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useProjectId } from '@/lib/project-context';
 import { CONSTRUCTION_PHASES } from '@/lib/constants';
+import { uploadFile } from '@/lib/upload-client';
 
 interface ProgressUpdate {
   id: string; title: string; description: string; phase: string;
@@ -29,11 +30,13 @@ export default function ProgressPage() {
 
     let image_path = '';
     if (imageFile) {
-      const fd = new FormData();
-      fd.append('file', imageFile);
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
-      const data = await res.json();
-      image_path = data.path || '';
+      try {
+        image_path = await uploadFile(imageFile);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Upload failed');
+        setSaving(false);
+        return;
+      }
     }
 
     await fetch('/api/progress', {
