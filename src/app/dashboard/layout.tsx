@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { ProjectContext } from '@/lib/project-context';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/dashboard/expenses', label: 'Expenses', icon: '💰' },
-  { href: '/dashboard/budget', label: 'Budget', icon: '🎯' },
-  { href: '/dashboard/progress', label: 'Progress', icon: '🏗️' },
-  { href: '/dashboard/import', label: 'Import Data', icon: '📥' },
+  { href: '/dashboard', label: 'Overview' },
+  { href: '/dashboard/expenses', label: 'Expenses' },
+  { href: '/dashboard/budget', label: 'Budget' },
+  { href: '/dashboard/progress', label: 'Progress' },
+  { href: '/dashboard/import', label: 'Import' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -38,49 +38,55 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/');
   }
 
-  if (!user) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
+  if (!user) return <div className="min-h-screen grid place-items-center"><p className="font-display italic text-2xl text-ink-3">Opening the ledger…</p></div>;
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      <div className="md:hidden bg-white border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="font-bold text-lg">🏠 Home Build Tracker</h1>
-        <button onClick={() => setMobileNav(!mobileNav)} className="p-2">☰</button>
-      </div>
-      <aside className={`${mobileNav ? 'block' : 'hidden'} md:block w-full md:w-64 bg-white border-r md:min-h-screen`}>
-        <div className="p-6 hidden md:block">
-          <h1 className="font-bold text-xl text-gray-800">🏠 Home Build Tracker</h1>
-          <p className="text-sm text-gray-500 mt-1">Welcome, {user.name}</p>
-        </div>
-        <div className="px-4 pb-4">
-          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Project</label>
-          <select value={projectId} onChange={e => setProjectId(e.target.value)}
-            className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-gray-50">
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-        <nav className="px-3 space-y-1">
-          {NAV_ITEMS.map(item => (
-            <Link key={item.href} href={item.href} onClick={() => setMobileNav(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                pathname === item.href ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
-              }`}>
-              <span>{item.icon}</span>{item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="px-3 mt-8">
-          <button onClick={logout} className="w-full px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition text-left">
-            🚪 Sign Out
+    <div className="min-h-screen lg:grid lg:grid-cols-[15rem_1fr]">
+      <aside className="bg-sand lg:min-h-screen lg:sticky lg:top-0 lg:h-screen flex flex-col">
+        <div className="flex items-center justify-between px-6 py-5 lg:pt-10 lg:pb-12">
+          <Link href="/dashboard" className="font-display text-[1.7rem] leading-none">
+            Build <span className="italic text-accent">Ledger</span>
+          </Link>
+          <button onClick={() => setMobileNav(!mobileNav)} className="lg:hidden btn-quiet" aria-expanded={mobileNav} aria-controls="main-nav">
+            {mobileNav ? 'Close' : 'Menu'}
           </button>
         </div>
+
+        <div id="main-nav" className={`${mobileNav ? 'flex' : 'hidden'} lg:flex flex-col flex-1 px-6 pb-8`}>
+          {projects.length > 1 && (
+            <label className="block mb-8">
+              <span className="eyebrow">Project</span>
+              <select value={projectId} onChange={e => setProjectId(e.target.value)} className="field">
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </label>
+          )}
+          <nav className="space-y-0.5" aria-label="Main">
+            {NAV_ITEMS.map((item, i) => {
+              const active = pathname === item.href;
+              return (
+                <Link key={item.href} href={item.href} onClick={() => setMobileNav(false)} aria-current={active ? 'page' : undefined}
+                  className={`group flex items-baseline gap-3 py-2 text-[15px] transition-colors ${active ? 'text-ink' : 'text-ink-2 hover:text-ink'}`}>
+                  <span className={`num text-[11px] w-5 ${active ? 'text-accent' : 'text-ink-3'}`}>{String(i + 1).padStart(2, '0')}</span>
+                  <span className={active ? 'font-medium' : ''}>{item.label}</span>
+                  {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent self-center" aria-hidden />}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="mt-auto pt-10 text-sm">
+            <p className="text-ink-3">Signed in as</p>
+            <p className="text-ink">{user.name}</p>
+            <button onClick={logout} className="mt-3 text-ink-3 hover:text-accent underline underline-offset-4 decoration-ink/20">Sign out</button>
+          </div>
+        </div>
       </aside>
-      <main className="flex-1 p-4 md:p-8">
+
+      <main className="min-w-0 px-5 sm:px-8 lg:px-14 py-8 lg:py-12">
         {projectId ? (
-          <ProjectContext.Provider value={projectId}>
-            {children}
-          </ProjectContext.Provider>
+          <ProjectContext.Provider value={projectId}>{children}</ProjectContext.Provider>
         ) : (
-          <p className="text-gray-500">No project found. Create one to get started.</p>
+          <p className="font-display text-3xl text-ink-2">No project yet.</p>
         )}
       </main>
     </div>

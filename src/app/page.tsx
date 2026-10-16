@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { at } from '@/lib/reveal';
 
 export default function Home() {
   const [isLogin, setIsLogin] = useState(true);
@@ -30,38 +31,59 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800">🏠 Home Build Tracker</h1>
-          <p className="text-gray-500 mt-2">Track every dollar of your home construction</p>
+    <main className="min-h-screen grid lg:grid-cols-12">
+      <section className="lg:col-span-7 px-6 sm:px-12 lg:pl-20 pt-12 pb-16 flex flex-col">
+        <p className="reveal eyebrow" style={at(0)}>Build Ledger</p>
+        <div className="mt-auto max-w-2xl lg:ml-[8%]">
+          <h1 className="reveal font-display text-[13vw] sm:text-7xl lg:text-[6.5rem] leading-[0.92] tracking-tight" style={at(1)}>
+            Every dollar <br />
+            <span className="italic text-ink-2">that went into</span> <br />
+            the <span className="text-accent">house</span>.
+          </h1>
+          <p className="reveal mt-8 max-w-sm text-ink-2 leading-relaxed lg:ml-auto lg:mr-12" style={at(2)}>
+            Owner and builder payments, the quote you&apos;re measured against, and the receipts behind them, kept in one ledger.
+          </p>
         </div>
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
-            <button onClick={() => setIsLogin(true)} className={`flex-1 py-2 rounded-md text-sm font-medium transition ${isLogin ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>Sign In</button>
-            <button onClick={() => setIsLogin(false)} className={`flex-1 py-2 rounded-md text-sm font-medium transition ${!isLogin ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>Register</button>
+      </section>
+
+      <section className="reveal lg:col-span-5 bg-sand px-6 sm:px-12 py-14 lg:py-0 flex items-center" style={at(3)}>
+        <div className="w-full max-w-sm lg:mt-40">
+          <div className="flex gap-6 mb-10 text-sm">
+            {[['Sign in', true], ['Create account', false]].map(([label, value]) => (
+              <button key={String(label)} onClick={() => { setIsLogin(value as boolean); setError(''); }}
+                className={`pb-1 border-b-2 transition-colors ${isLogin === value ? 'border-accent text-ink font-medium' : 'border-transparent text-ink-3 hover:text-ink-2'}`}>
+                {label}
+              </button>
+            ))}
           </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
-              <input type="text" placeholder="Your Name" value={name} onChange={e => setName(e.target.value)} required
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+              <label className="block">
+                <span className="eyebrow">Name</span>
+                <input type="text" value={name} onChange={e => setName(e.target.value)} required autoComplete="name" className="field" />
+              </label>
             )}
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+            <label className="block">
+              <span className="eyebrow">Email</span>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" className="field" />
+            </label>
+            <label className="block">
+              <span className="eyebrow">Password</span>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete={isLogin ? 'current-password' : 'new-password'} className="field" />
+            </label>
             {!isLogin && (
-              <input type="text" placeholder="Invite code (not needed for the first account)" value={inviteCode} onChange={e => setInviteCode(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+              <label className="block">
+                <span className="eyebrow">Invite code</span>
+                <input type="text" value={inviteCode} onChange={e => setInviteCode(e.target.value)} placeholder="Not needed for the first account" className="field" />
+              </label>
             )}
-            {error && <p className="text-red-500 text-sm">{error}</p>}
-            <button type="submit" disabled={loading}
-              className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition">
-              {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
+            {error && <p role="alert" className="text-sm text-accent-deep">{error}</p>}
+            <button type="submit" disabled={loading} className="btn-ink w-full justify-center mt-4">
+              {loading ? 'One moment…' : isLogin ? 'Open the ledger' : 'Create account'}
             </button>
           </form>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

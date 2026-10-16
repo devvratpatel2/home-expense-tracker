@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   if (!(await ownsProject(userId, body.project_id))) return notFound();
 
   const f = cleanFields(body);
-  if (!f.description || !Number.isFinite(f.amount)) return NextResponse.json({ error: 'Description and amount required' }, { status: 400 });
+  if (!f.description || !Number.isFinite(f.amount) || !f.date) return NextResponse.json({ error: 'Description, amount and a valid date are required' }, { status: 400 });
 
   const id = uuid();
   await getDb().execute({
@@ -64,7 +64,7 @@ export async function PUT(req: NextRequest) {
   if (!(await ownsProject(userId, projectId))) return notFound();
 
   const f = cleanFields(body);
-  if (!f.description || !Number.isFinite(f.amount)) return NextResponse.json({ error: 'Description and amount required' }, { status: 400 });
+  if (!f.description || !Number.isFinite(f.amount) || !f.date) return NextResponse.json({ error: 'Description, amount and a valid date are required' }, { status: 400 });
 
   await getDb().execute({
     sql: `UPDATE expenses SET category_id = ?, description = ?, amount = ?, date = ?, vendor = ?,

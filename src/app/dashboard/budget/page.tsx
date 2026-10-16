@@ -1,23 +1,33 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useProjectId } from '@/lib/project-context';
+import { money, pct } from '@/lib/format';
+import { at } from '@/lib/reveal';
 
-interface Category { id: string; name: string; budget: number; spent: number; expense_count: number; }
-interface Project { id: string; name: string; budget: number; }
+interface Category { id: string; name: string; budget: number; expense_count: number; }
+interface Project { id: string; name: string; budget: number; budget_sheet_url?: string; }
+interface Spend { name: string; total: number; owner: number; builder: number; budget: number }
+interface Saving { name: string; budget: number; spent: number; saved: number }
 
-const money = (n: number) => `$${Math.round(Number(n)).toLocaleString()}`;
-const toNumber = (v: string) => parseFloat(v.replace(/[$,]/g, '')) || 0;
+const toNumber = (v: string) => parseFloat(v.replace(/[$,\s]/g, '')) || 0;
 
 export default function BudgetPage() {
   const projectId = useProjectId();
   const [project, setProject] = useState<Project | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [spend, setSpend] = useState<Map<string, Spend>>(new Map());
+  const [savings, setSavings] = useState<Saving[]>([]);
   const [newName, setNewName] = useState('');
 
   function load() {
     if (!projectId) return;
     fetch('/api/projects').then(r => r.json()).then((ps: Project[]) => setProject(ps.find(p => p.id === projectId) || null));
     fetch(`/api/categories?projectId=${projectId}`).then(r => r.json()).then(setCategories);
+    fetch(`/api/dashboard?projectId=${projectId}`).then(r => r.json()).then(d => {
+      setSpend(new Map((d.byCategory as Spend[]).map(c => [c.name, c])));
+      setSavings(d.ownerSavings);
+    });
   }
 
   useEffect(load, [projectId]);
@@ -47,94 +57,137 @@ export default function BudgetPage() {
     load();
   }
 
-  if (!project) return null;
+  if (!project) return <p className="font-display italic text-2xl text-ink-3">Loading the budget…</p>;
 
-  const sorted = [...categories].sort((a, b) => Number(b.spent) - Number(a.spent));
+  const spentOf = (c: Category) => spend.get(c.name)?.total ?? 0;
+  const sorted = [...categories].sort((a, b) => spentOf(b) - spentOf(a) || Number(b.budget) - Number(a.budget));
   const allocated = categories.reduce((s, c) => s + Number(c.budget), 0);
-  const spent = categories.reduce((s, c) => s + Number(c.spent), 0);
+  const spent = Array.from(spend.values()).reduce((s, c) => s + c.total, 0);
+  const totalSaved = savings.reduce((s, c) => s + c.saved, 0);
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <h2 className="text-2xl font-bold text-gray-800">Budget & Categories</h2>
+    <div className="max-w-[1320px]">
+      <div className="grid lg:grid-cols-12 gap-x-10 gap-y-10">
+        <section className="reveal lg:col-span-6" style={at(0)}>
+          <p className="eyebrow">The quote</p>
+          <h1 className="font-display text-6xl lg:text-7xl leading-none mt-2">Budget</h1>
+          <label className="block mt-10 max-w-md">
+            <span className="eyebrow">Total budget</span>
+            <input defaultValue={project.budget ? money(project.budget, !Number.isInteger(Number(project.budget))) : ''} key={`b-${project.budget}`} inputMode="decimal" placeholder="$0"
+              onBlur={e => toNumber(e.target.value) !== Number(project.budget) && saveProject({ budget: toNumber(e.target.value) })}
+              className="field !text-5xl font-display num !py-1" aria-label="Total budget" />
+          </label>
+          <dl className="mt-8 grid grid-cols-3 gap-6 max-w-lg text-sm">
+            <div><dt className="text-ink-3">Spent</dt><dd className="num text-lg mt-1">{money(spent)}</dd></div>
+            <div><dt className="text-ink-3">Given to categories</dt><dd className="num text-lg mt-1">{money(allocated)}</dd></div>
+            <div><dt className="text-ink-3">Not yet given out</dt><dd className={`num text-lg mt-1 ${project.budget - allocated < 0 ? 'text-accent' : ''}`}>{money(project.budget - allocated)}</dd></div>
+          </dl>
+          <p className="mt-8 text-sm text-ink-2 max-w-md">
+            Have the builder&apos;s quote in a sheet? <Link href="/dashboard/import" className="text-accent underline underline-offset-4">Import it</Link> to fill
+            every category budget at once{project.budget_sheet_url ? ' (it remembers your quote sheet)' : ''}.
+          </p>
+          <label className="block mt-8 max-w-md">
+            <span className="eyebrow">Project name</span>
+            <input defaultValue={project.name} key={`n-${project.name}`} onBlur={e => e.target.value.trim() && e.target.value !== project.name && saveProject({ name: e.target.value })} className="field" />
+          </label>
+        </section>
 
-      <div className="bg-white rounded-xl p-5 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <label className="text-sm text-gray-600">
-          Project name
-          <input defaultValue={project.name} key={`n-${project.name}`} onBlur={e => e.target.value !== project.name && saveProject({ name: e.target.value })}
-            className="mt-1 w-full px-3 py-2 border rounded-lg" />
-        </label>
-        <label className="text-sm text-gray-600">
-          Total budget
-          <input defaultValue={project.budget || ''} key={`b-${project.budget}`} inputMode="decimal" placeholder="e.g. 763390"
-            onBlur={e => toNumber(e.target.value) !== Number(project.budget) && saveProject({ budget: toNumber(e.target.value) })}
-            className="mt-1 w-full px-3 py-2 border rounded-lg" />
-        </label>
-        <div className="text-sm text-gray-600">
-          Allocated to categories
-          <p className="mt-2 text-lg font-semibold text-gray-800">{money(allocated)}</p>
-          {project.budget > 0 && <p className="text-xs text-gray-400">{money(project.budget - allocated)} unallocated</p>}
+        <section className="reveal lg:col-span-6 lg:mt-24 bg-sand rounded-sm p-6 lg:p-8 self-start" style={at(1)}>
+          <h2 className="font-display text-3xl">Bought by you vs the quote</h2>
+          <p className="text-sm text-ink-2 mt-2">For each category where the owner paid for some of it, what was spent in total against the quote for that line.</p>
+          {savings.length ? (
+            <>
+              <p className="mt-6">
+                <span className={`num font-display text-5xl ${totalSaved >= 0 ? '' : 'text-accent'}`}>{money(Math.abs(totalSaved))}</span>
+                <span className="ml-2 text-ink-2">{totalSaved >= 0 ? 'under' : 'over'} the quote overall</span>
+              </p>
+              <table className="ledger mt-6">
+                <thead><tr><th>Category</th><th className="!text-right">Quote</th><th className="!text-right">Spent</th><th className="!text-right">Difference</th></tr></thead>
+                <tbody>
+                  {savings.map(s => (
+                    <tr key={s.name}>
+                      <td>{s.name}</td>
+                      <td className="text-right num text-ink-2">{money(s.budget)}</td>
+                      <td className="text-right num">{money(s.spent)}</td>
+                      <td className={`text-right num font-medium ${s.saved < 0 ? 'text-accent' : ''}`}>{s.saved >= 0 ? '−' : '+'}{money(Math.abs(s.saved))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <p className="mt-6 text-ink-3 italic">Shows up once categories have budgets and some owner-paid expenses.</p>
+          )}
+        </section>
+      </div>
+
+      <section className="reveal mt-16" style={at(2)}>
+        <div className="flex flex-wrap items-baseline justify-between gap-4">
+          <h2 className="font-display text-4xl">Categories</h2>
+          <form onSubmit={addCategory} className="flex items-end gap-3 w-full sm:w-auto">
+            <label className="flex-1 sm:w-64 block">
+              <span className="sr-only">New category name</span>
+              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New category" className="field" />
+            </label>
+            <button className="btn-ink">Add</button>
+          </form>
         </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b text-gray-600">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Category</th>
-              <th className="px-3 py-2 text-right font-medium">Spent</th>
-              <th className="px-3 py-2 text-right font-medium">Budget</th>
-              <th className="px-3 py-2 text-left font-medium w-48">Used</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map(c => {
-              const used = c.budget > 0 ? (Number(c.spent) / Number(c.budget)) * 100 : 0;
-              return (
-                <tr key={c.id} className="border-b last:border-0">
-                  <td className="px-3 py-1.5">
-                    <input defaultValue={c.name} key={`cn-${c.id}-${c.name}`} onBlur={e => e.target.value.trim() && e.target.value !== c.name && saveCategory(c.id, { name: e.target.value })}
-                      className="w-full px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-blue-400 outline-none" aria-label="Category name" />
-                  </td>
-                  <td className="px-3 py-1.5 text-right whitespace-nowrap">{money(c.spent)} <span className="text-xs text-gray-400">({c.expense_count})</span></td>
-                  <td className="px-3 py-1.5 text-right">
-                    <input defaultValue={c.budget || ''} key={`cb-${c.id}-${c.budget}`} inputMode="decimal" placeholder="—"
-                      onBlur={e => toNumber(e.target.value) !== Number(c.budget) && saveCategory(c.id, { budget: toNumber(e.target.value) })}
-                      className="w-28 px-2 py-1 text-right rounded border border-gray-200 focus:border-blue-400 outline-none" aria-label={`Budget for ${c.name}`} />
-                  </td>
-                  <td className="px-3 py-1.5">
-                    {c.budget > 0 && (
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full">
-                          <div className={`h-2 rounded-full ${used > 100 ? 'bg-red-500' : used > 90 ? 'bg-amber-500' : 'bg-green-500'}`} style={{ width: `${Math.min(used, 100)}%` }} />
+        <div className="mt-6 overflow-x-auto">
+          <table className="ledger">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th className="!text-right">Spent</th>
+                <th className="!text-right">Budget</th>
+                <th className="w-56">Used</th>
+                <th className="w-16"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(c => {
+                const s = spentOf(c);
+                const used = c.budget > 0 ? s / Number(c.budget) : 0;
+                return (
+                  <tr key={c.id} className="group">
+                    <td className="!py-1.5">
+                      <input defaultValue={c.name} key={`cn-${c.id}-${c.name}`} onBlur={e => e.target.value.trim() && e.target.value !== c.name && saveCategory(c.id, { name: e.target.value })}
+                        className="field !border-transparent hover:!border-ink/20 focus:!border-accent" aria-label="Category name" />
+                    </td>
+                    <td className="text-right whitespace-nowrap num !py-3.5">{money(s)} <span className="text-xs text-ink-3">· {c.expense_count}</span></td>
+                    <td className="text-right !py-1.5">
+                      <input defaultValue={c.budget ? Number(c.budget) : ''} key={`cb-${c.id}-${c.budget}`} inputMode="decimal" placeholder="—"
+                        onBlur={e => toNumber(e.target.value) !== Number(c.budget) && saveCategory(c.id, { budget: toNumber(e.target.value) })}
+                        className="field !w-28 ml-auto text-right num" aria-label={`Budget for ${c.name}`} />
+                    </td>
+                    <td className="!py-4">
+                      {c.budget > 0 && (
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-1.5 rounded-full bg-ink/[0.07] overflow-hidden">
+                            <div className={`h-full rounded-full ${used > 1 ? 'bg-accent' : 'bg-ink'}`} style={{ width: `${Math.min(used, 1) * 100}%` }} />
+                          </div>
+                          <span className={`num text-xs w-10 text-right ${used > 1 ? 'text-accent font-medium' : 'text-ink-3'}`}>{pct(s, Number(c.budget))}</span>
                         </div>
-                        <span className={`text-xs w-10 text-right ${used > 100 ? 'text-red-600' : 'text-gray-500'}`}>{Math.round(used)}%</span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-1.5 text-right">
-                    <button onClick={() => deleteCategory(c)} title="Delete category" className="text-gray-300 hover:text-red-600">🗑️</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot className="border-t bg-gray-50 font-semibold">
-            <tr>
-              <td className="px-3 py-2">Total</td>
-              <td className="px-3 py-2 text-right">{money(spent)}</td>
-              <td className="px-3 py-2 text-right">{money(allocated)}</td>
-              <td colSpan={2} />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <form onSubmit={addCategory} className="flex gap-2">
-        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New category name" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">Add category</button>
-      </form>
-      <p className="text-xs text-gray-400">Edits save when you click out of a field. Spent includes only categorized expenses.</p>
+                      )}
+                    </td>
+                    <td className="text-right !py-3.5">
+                      <button onClick={() => deleteCategory(c)} className="text-xs text-ink-3 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition-opacity">Delete</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-ink">
+                <td className="py-3 font-medium">Total</td>
+                <td className="py-3 px-3 text-right num font-medium">{money(spent)}</td>
+                <td className="py-3 px-3 text-right num font-medium">{money(allocated)}</td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <p className="mt-4 text-xs text-ink-3">Changes save when you leave a field. Payments split across categories count toward each one.</p>
+      </section>
     </div>
   );
 }

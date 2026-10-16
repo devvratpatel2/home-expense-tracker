@@ -3,19 +3,25 @@ import { useEffect, useState } from 'react';
 import { useProjectId } from '@/lib/project-context';
 import { CONSTRUCTION_PHASES } from '@/lib/constants';
 import { uploadFile } from '@/lib/upload-client';
+import { longDate } from '@/lib/format';
+import { at } from '@/lib/reveal';
 
 interface ProgressUpdate {
   id: string; title: string; description: string; phase: string;
   status: string; image_path: string; date: string;
 }
 
+const STATUS_LABEL: Record<string, string> = { not_started: 'Not started', in_progress: 'In progress', completed: 'Done', delayed: 'Delayed' };
+const blank = () => ({ title: '', description: '', phase: '', status: 'in_progress', date: new Date().toISOString().split('T')[0] });
+
 export default function ProgressPage() {
   const projectId = useProjectId();
   const [updates, setUpdates] = useState<ProgressUpdate[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', phase: '', status: 'in_progress', date: new Date().toISOString().split('T')[0] });
+  const [form, setForm] = useState(blank);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   function load() {
     if (!projectId) return;
@@ -27,135 +33,120 @@ export default function ProgressPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-
-    let image_path = '';
-    if (imageFile) {
-      try {
-        image_path = await uploadFile(imageFile);
-      } catch (err) {
-        alert(err instanceof Error ? err.message : 'Upload failed');
-        setSaving(false);
-        return;
-      }
+    setError('');
+    try {
+      const image_path = imageFile ? await uploadFile(imageFile) : '';
+      await fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, project_id: projectId, image_path }),
+      });
+      setForm(blank());
+      setImageFile(null);
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setSaving(false);
     }
-
-    await fetch('/api/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, project_id: projectId, image_path }),
-    });
-
-    setForm({ title: '', description: '', phase: '', status: 'in_progress', date: new Date().toISOString().split('T')[0] });
-    setImageFile(null);
-    setShowForm(false);
-    setSaving(false);
-    load();
   }
 
-  const statusColors: Record<string, string> = {
-    completed: 'bg-green-100 text-green-700',
-    in_progress: 'bg-blue-100 text-blue-700',
-    not_started: 'bg-gray-100 text-gray-600',
-    delayed: 'bg-red-100 text-red-700',
+  const phaseState = (phase: string) => {
+    const list = updates.filter(u => u.phase === phase);
+    if (list.some(u => u.status === 'completed')) return 'done';
+    if (list.some(u => u.status === 'delayed')) return 'delayed';
+    if (list.some(u => u.status === 'in_progress')) return 'active';
+    return 'todo';
   };
+  const doneCount = CONSTRUCTION_PHASES.filter(p => phaseState(p) === 'done').length;
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Construction Progress</h2>
-          <p className="text-gray-500">Track milestones and phases of your build</p>
-        </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">
-          {showForm ? '✕ Cancel' : '+ Add Update'}
-        </button>
-      </div>
-
-      {/* Phase Overview */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h3 className="font-semibold text-gray-700 mb-4">Build Phases</h3>
-        <div className="space-y-2">
+    <div className="max-w-[1320px] grid lg:grid-cols-12 gap-x-12 gap-y-10">
+      <aside className="reveal lg:col-span-4 lg:sticky lg:top-12 self-start" style={at(0)}>
+        <p className="eyebrow">On site</p>
+        <h1 className="font-display text-6xl lg:text-7xl leading-none mt-2">Progress</h1>
+        <p className="mt-4 text-ink-2"><span className="num font-display text-3xl text-ink">{doneCount}</span> of {CONSTRUCTION_PHASES.length} phases done</p>
+        <ol className="mt-8 space-y-2.5">
           {CONSTRUCTION_PHASES.map((phase, i) => {
-            const phaseUpdates = updates.filter(u => u.phase === phase);
-            const isComplete = phaseUpdates.some(u => u.status === 'completed');
-            const isActive = phaseUpdates.some(u => u.status === 'in_progress');
+            const s = phaseState(phase);
             return (
-              <div key={phase} className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  isComplete ? 'bg-green-500 text-white' : isActive ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'
-                }`}>{isComplete ? '✓' : i + 1}</div>
-                <span className={`text-sm ${isComplete ? 'text-green-700 font-medium' : isActive ? 'text-blue-700 font-medium' : 'text-gray-500'}`}>{phase}</span>
-              </div>
+              <li key={phase} className="flex items-baseline gap-3 text-sm">
+                <span className={`num text-[11px] w-5 ${s === 'active' || s === 'delayed' ? 'text-accent' : 'text-ink-3'}`}>{String(i + 1).padStart(2, '0')}</span>
+                <span className={s === 'done' ? 'line-through decoration-ink/30 text-ink-3' : s === 'todo' ? 'text-ink-2' : 'text-ink font-medium'}>{phase}</span>
+                {s === 'active' && <span className="text-xs text-accent">now</span>}
+                {s === 'delayed' && <span className="text-xs text-accent">delayed</span>}
+              </li>
             );
           })}
+        </ol>
+      </aside>
+
+      <div className="lg:col-span-8 lg:pt-28">
+        <div className="reveal flex justify-end" style={at(1)}>
+          <button onClick={() => setShowForm(!showForm)} className={showForm ? 'btn-ink' : 'btn-accent'}>{showForm ? 'Close' : 'Post an update'}</button>
         </div>
-      </div>
 
-      {/* Add Update Form */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl p-6 shadow-sm space-y-4">
-          <h3 className="font-semibold text-gray-700">New Progress Update</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <input placeholder="Title *" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-              className="px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
-              className="px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-            <select value={form.phase} onChange={e => setForm({ ...form, phase: e.target.value })}
-              className="px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-              <option value="">Select Phase</option>
-              {CONSTRUCTION_PHASES.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
-              className="px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-              <option value="not_started">Not Started</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="delayed">Delayed</option>
-            </select>
-          </div>
-          <textarea placeholder="Description / Notes" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3}
-            className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-          <div>
-            <label className="text-sm text-gray-600 block mb-1">Photo (optional)</label>
-            <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)}
-              className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-medium" />
-          </div>
-          <button type="submit" disabled={saving}
-            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
-            {saving ? 'Saving...' : 'Save Update'}
-          </button>
-        </form>
-      )}
-
-      {/* Timeline */}
-      <div className="space-y-4">
-        {updates.map(update => (
-          <div key={update.id} className="bg-white rounded-xl p-5 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div>
-                <h4 className="font-semibold text-gray-800">{update.title}</h4>
-                <div className="flex items-center gap-2 mt-1">
-                  {update.phase && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{update.phase}</span>}
-                  <span className={`text-xs px-2 py-0.5 rounded ${statusColors[update.status] || 'bg-gray-100'}`}>
-                    {update.status.replace('_', ' ')}
-                  </span>
-                  <span className="text-xs text-gray-400">{update.date}</span>
-                </div>
-              </div>
+        {showForm && (
+          <form onSubmit={handleSubmit} className="mt-6 bg-sand rounded-sm p-6 grid sm:grid-cols-2 gap-x-6 gap-y-5">
+            <label className="sm:col-span-2 block">
+              <span className="eyebrow">Title</span>
+              <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="field text-base" />
+            </label>
+            <label className="block">
+              <span className="eyebrow">Phase</span>
+              <select value={form.phase} onChange={e => setForm({ ...form, phase: e.target.value })} className="field">
+                <option value="">—</option>
+                {CONSTRUCTION_PHASES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-6">
+              <label className="block">
+                <span className="eyebrow">Status</span>
+                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="field">
+                  {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="eyebrow">Date</span>
+                <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="field" />
+              </label>
             </div>
-            {update.description && <p className="text-sm text-gray-600 mt-3">{update.description}</p>}
-            {update.image_path && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={update.image_path} alt={update.title} className="mt-3 rounded-lg max-h-64 object-cover" />
-            )}
-          </div>
-        ))}
-        {updates.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            <p className="text-4xl mb-2">🏗️</p>
-            <p>No progress updates yet. Document your build journey!</p>
-          </div>
+            <label className="sm:col-span-2 block">
+              <span className="eyebrow">Notes</span>
+              <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} className="field resize-y" />
+            </label>
+            <label className="block">
+              <span className="eyebrow">Photo</span>
+              <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)}
+                className="mt-2 block w-full text-sm text-ink-2 file:mr-3 file:rounded-full file:border-0 file:bg-paper file:px-4 file:py-1.5 file:text-ink" />
+            </label>
+            <div className="flex items-end justify-end gap-3">
+              {error && <p role="alert" className="text-sm text-accent-deep">{error}</p>}
+              <button type="submit" disabled={saving} className="btn-ink">{saving ? 'Saving…' : 'Save update'}</button>
+            </div>
+          </form>
+        )}
+
+        <ol className="reveal mt-10 space-y-14" style={at(2)}>
+          {updates.map((u, i) => (
+            <li key={u.id} className={`grid sm:grid-cols-12 gap-6 items-start ${i % 2 ? 'sm:pl-[8%]' : ''}`}>
+              {u.image_path && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={u.image_path} alt={u.title} className={`sm:col-span-6 w-full rounded-sm object-cover aspect-[4/3] ${i % 2 ? 'sm:order-2' : ''}`} />
+              )}
+              <div className={u.image_path ? 'sm:col-span-6' : 'sm:col-span-9'}>
+                <p className="text-xs text-ink-3 num">
+                  {longDate(u.date)}{u.phase && <> · {u.phase}</>} · <span className={u.status === 'delayed' || u.status === 'in_progress' ? 'text-accent' : ''}>{STATUS_LABEL[u.status] || u.status}</span>
+                </p>
+                <h3 className="font-display text-3xl mt-1 leading-tight">{u.title}</h3>
+                {u.description && <p className="mt-3 text-ink-2 leading-relaxed whitespace-pre-line">{u.description}</p>}
+              </div>
+            </li>
+          ))}
+        </ol>
+        {updates.length === 0 && !showForm && (
+          <p className="mt-10 font-display italic text-3xl text-ink-3 max-w-md">No updates yet. Post the first photo from site.</p>
         )}
       </div>
     </div>

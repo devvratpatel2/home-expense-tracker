@@ -1,3 +1,45 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body { font-feature-settings: 'ss01', 'tnum'; }
+  ::selection { background: theme('colors.accent.soft'); color: theme('colors.ink.DEFAULT'); }
+  :focus-visible { outline: 2px solid theme('colors.accent.DEFAULT'); outline-offset: 2px; }
+}
+
+@layer components {
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-eyebrow text-ink-3; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* Fields sit on whatever tone they are placed on; only the underline marks them. */
+  .field {
+    @apply w-full bg-transparent border-0 border-b border-ink/20 px-0 py-2 text-sm text-ink placeholder:text-ink-3
+      focus:border-accent focus:outline-none focus:ring-0 transition-colors;
+  }
+  .field-box { @apply w-full bg-paper/70 rounded-md px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:bg-paper focus:outline-none; }
+
+  .btn { @apply inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-colors disabled:opacity-50; }
+  .btn-ink { @apply btn bg-ink text-paper hover:bg-ink-2; }
+  .btn-accent { @apply btn bg-accent text-paper hover:bg-accent-deep; }
+  .btn-quiet { @apply btn px-3 text-ink-2 hover:text-ink hover:bg-ink/5; }
+
+  .ledger { @apply w-full text-sm; }
+  .ledger th { @apply eyebrow text-left font-semibold py-3 px-3 first:pl-0 last:pr-0; }
+  .ledger td { @apply py-3 px-3 first:pl-0 last:pr-0 align-top; }
+  .ledger tbody tr { @apply border-t border-ink/10; }
+}
+
+/* The one page-load moment: blocks rise out of a mask, one after another. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(28px); clip-path: inset(0 0 100% 0); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; clip-path: inset(0 0 -10% 0); }
+}
+.reveal {
+  animation: rise 900ms cubic-bezier(0.19, 0.8, 0.22, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 60ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { animation: none; }
+}

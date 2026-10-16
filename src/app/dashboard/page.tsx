@@ -2,224 +2,302 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useProjectId } from '@/lib/project-context';
-import {
-  Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts';
+import { money, shortMoney, pct, monthLabel, longDate } from '@/lib/format';
+import { at } from '@/lib/reveal';
+import type { Issue } from '@/lib/insights';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 interface DashboardData {
+  projectName: string;
   totalSpent: number;
   budget: number;
   expenseCount: number;
   remaining: number;
+  firstDate: string;
+  lastDate: string;
   byPaidBy: { Owner: number; Builder: number; Unassigned: number };
-  byCategory: { name: string; total: number; budget: number }[];
+  byCategory: { name: string; total: number; owner: number; builder: number; count: number; budget: number }[];
+  ownerSavings: { name: string; budget: number; spent: number; saved: number }[];
+  quote: { lines: number; spent: number; overLines: number; outside: { name: string; total: number }[] };
   monthly: { month: string; Owner: number; Builder: number; Unassigned: number; cumulative: number }[];
-  topVendors: { name: string; total: number }[];
+  topVendors: { name: string; total: number; count: number }[];
   recentExpenses: { id: string; description: string; amount: number; date: string; category_name: string; paid_by: string }[];
+  missing: { category: number; vendor: number; paidBy: number };
+  issues: Issue[];
 }
 
-const money = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(Math.round(Number(n))).toLocaleString()}`;
-const short = (n: number) => (Math.abs(n) >= 1000 ? `$${Math.round(n / 1000)}k` : `$${Math.round(n)}`);
-const OWNER = '#10B981';
-const BUILDER = '#6366F1';
-const OTHER = '#9CA3AF';
+const INK = '#1E1A15';
+const ACCENT = '#D8431A';
+const CLAY = '#B9A486';
+const axis = { fontSize: 11, fill: '#8C8273', fontFamily: 'var(--font-ui)' };
+const tooltipStyle = { background: INK, border: 'none', borderRadius: 4, color: '#F3EEE5', fontSize: 12, fontFamily: 'var(--font-ui)' };
 
 export default function DashboardPage() {
   const projectId = useProjectId();
   const [data, setData] = useState<DashboardData | null>(null);
-  const [editingBudget, setEditingBudget] = useState(false);
-  const [budgetInput, setBudgetInput] = useState('');
+  const [allCategories, setAllCategories] = useState(false);
 
-  function load() {
+  useEffect(() => {
     if (!projectId) return;
     fetch(`/api/dashboard?projectId=${projectId}`).then(r => r.json()).then(setData);
-  }
+  }, [projectId]);
 
-  useEffect(load, [projectId]);
-
-  async function saveBudget() {
-    await fetch('/api/projects', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: projectId, budget: parseFloat(budgetInput.replace(/[$,]/g, '')) || 0 }),
-    });
-    setEditingBudget(false);
-    load();
-  }
-
-  if (!data) return <div className="animate-pulse space-y-4"><div className="h-32 bg-gray-200 rounded-xl" /><div className="h-64 bg-gray-200 rounded-xl" /></div>;
+  if (!data) return <p className="font-display italic text-2xl text-ink-3">Adding it all up…</p>;
 
   if (data.expenseCount === 0) {
     return (
-      <div className="bg-white rounded-xl p-12 shadow-sm text-center max-w-2xl">
-        <p className="text-4xl mb-4">🏠</p>
-        <h3 className="text-xl font-semibold text-gray-700">No expenses yet</h3>
-        <p className="text-gray-500 mt-2">
-          <Link href="/dashboard/expenses" className="text-blue-600">Add an expense</Link> or{' '}
-          <Link href="/dashboard/import" className="text-blue-600">import your sheet</Link>.
+      <div className="max-w-3xl lg:ml-[10%] lg:mt-24">
+        <h1 className="reveal font-display text-6xl lg:text-7xl leading-[0.95]" style={at(0)}>
+          Nothing in the <span className="italic">ledger</span> yet.
+        </h1>
+        <p className="reveal mt-6 text-ink-2 max-w-md" style={at(1)}>
+          Bring your sheet in from the <Link href="/dashboard/import" className="text-accent underline underline-offset-4">Import</Link> page, or start adding payments on <Link href="/dashboard/expenses" className="text-accent underline underline-offset-4">Expenses</Link>.
         </p>
       </div>
     );
   }
 
-  const budgetPercent = data.budget > 0 ? (data.totalSpent / data.budget) * 100 : 0;
-
-  const categoryRows = data.byCategory;
-  const hasCategoryBudgets = data.byCategory.some(c => c.budget > 0);
-  const overBudget = data.byCategory.filter(c => c.budget > 0 && c.total > c.budget);
+  const { totalSpent, budget, byPaidBy } = data;
+  const over = budget > 0 && totalSpent > budget;
+  const crossed = budget > 0 ? data.monthly.find(m => m.cumulative > budget) : undefined;
+  const scale = Math.max(totalSpent, budget);
+  const categories = allCategories ? data.byCategory : data.byCategory.slice(0, 12);
+  const maxCategory = Math.max(...data.byCategory.map(c => Math.max(c.total, c.budget)), 1);
+  const ownerSaved = data.ownerSavings.reduce((s, c) => s + c.saved, 0);
+  const missingCount = data.missing.category + data.missing.vendor + data.missing.paidBy;
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
+    <div className="max-w-[1320px]">
+      <header className="reveal flex flex-wrap items-baseline gap-x-6 gap-y-1" style={at(0)}>
+        <p className="eyebrow">{data.projectName || 'Overview'}</p>
+        <p className="text-sm text-ink-3">
+          {data.expenseCount} payments · {longDate(data.firstDate)} to {longDate(data.lastDate)}
+        </p>
+      </header>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard label="Total spent" value={money(data.totalSpent)} sub={`${data.expenseCount} payments`} />
-        <div className="bg-white rounded-xl p-5 shadow-sm">
-          <p className="text-sm text-gray-500">Budget</p>
-          {editingBudget ? (
-            <form onSubmit={e => { e.preventDefault(); saveBudget(); }} className="mt-1 flex gap-2">
-              <input autoFocus value={budgetInput} onChange={e => setBudgetInput(e.target.value)} className="w-full px-2 py-1 border rounded text-lg" aria-label="Project budget" />
-              <button className="text-blue-600 text-sm">Save</button>
-            </form>
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-x-10 gap-y-12">
+        {/* Headline number */}
+        <section className="reveal lg:col-span-7" style={at(1)}>
+          <p className="eyebrow">Spent to date</p>
+          <p className="num font-display leading-[0.85] tracking-tight text-[clamp(3.75rem,10vw,8.5rem)] mt-3">{money(totalSpent)}</p>
+          {budget > 0 ? (
+            <>
+              <p className="mt-5 text-lg text-ink-2 max-w-xl">
+                against a {money(budget)} budget, which is{' '}
+                {over ? <span className="text-accent font-medium">{money(totalSpent - budget)} over</span> : <span className="text-ink font-medium">{money(budget - totalSpent)} left</span>}
+                {crossed && <> since {monthLabel(crossed.month)}</>}.
+              </p>
+              <div className="mt-6 flex h-2.5 w-full max-w-xl overflow-hidden rounded-full bg-dune" role="img" aria-label={`${pct(totalSpent, budget)} of budget used`}>
+                <div className="bg-ink" style={{ width: `${(Math.min(totalSpent, budget) / scale) * 100}%` }} />
+                {over && <div className="bg-accent" style={{ width: `${((totalSpent - budget) / scale) * 100}%` }} />}
+              </div>
+              <p className="mt-2 text-xs text-ink-3 num">{pct(totalSpent, budget)} of budget</p>
+              {data.quote.lines > 0 && data.quote.outside.length > 0 && (
+                <div className="mt-8 grid grid-cols-2 gap-6 max-w-xl text-sm">
+                  <div>
+                    <p className="text-ink-3">Under a quote line</p>
+                    <p className="num font-display text-3xl mt-1">{money(data.quote.spent)}</p>
+                    <p className="text-xs text-ink-3 mt-1">{data.quote.lines} lines{data.quote.overLines > 0 && <>, <span className="text-accent">{data.quote.overLines} over</span></>}</p>
+                  </div>
+                  <div>
+                    <p className="text-ink-3">Not in the quote</p>
+                    <p className="num font-display text-3xl mt-1">{money(totalSpent - data.quote.spent)}</p>
+                    <p className="text-xs text-ink-3 mt-1 line-clamp-2">{data.quote.outside.slice(0, 4).map(c => c.name).join(', ')}{data.quote.outside.length > 4 ? ` and ${data.quote.outside.length - 4} more` : ''}</p>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
-            <button onClick={() => { setBudgetInput(String(data.budget || '')); setEditingBudget(true); }} className="text-2xl font-bold text-gray-800 mt-1 hover:text-blue-600">
-              {data.budget ? money(data.budget) : 'Set budget'}
+            <p className="mt-5 text-ink-2">
+              No budget yet. <Link href="/dashboard/budget" className="text-accent underline underline-offset-4">Set one</Link> or import the builder&apos;s quote sheet.
+            </p>
+          )}
+        </section>
+
+        {/* Who paid */}
+        <section className="reveal lg:col-span-5 lg:mt-14 bg-ink text-paper rounded-sm p-7 lg:p-9" style={at(2)}>
+          <p className="eyebrow !text-paper/50">Who paid</p>
+          <div className="mt-6 grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm text-accent-soft flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-accent" />Owner</p>
+              <p className="num font-display text-4xl lg:text-5xl mt-1">{shortMoney(byPaidBy.Owner)}</p>
+              <p className="text-xs text-paper/50 num mt-1">{pct(byPaidBy.Owner, totalSpent)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-paper/70 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-paper/70" />Builder</p>
+              <p className="num font-display text-4xl lg:text-5xl mt-1">{shortMoney(byPaidBy.Builder)}</p>
+              <p className="text-xs text-paper/50 num mt-1">{pct(byPaidBy.Builder, totalSpent)}</p>
+            </div>
+          </div>
+          <div className="mt-6 flex h-2 overflow-hidden rounded-full bg-paper/10">
+            <div className="bg-accent" style={{ width: pct(byPaidBy.Owner, totalSpent) }} />
+            <div className="bg-paper/70" style={{ width: pct(byPaidBy.Builder, totalSpent) }} />
+          </div>
+          {byPaidBy.Unassigned > 0 && <p className="mt-3 text-xs text-paper/50">{money(byPaidBy.Unassigned)} has no payer set.</p>}
+          {data.ownerSavings.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-paper/10">
+              <p className="text-sm text-paper/70">Categories where you bought materials yourself</p>
+              <p className="mt-1">
+                <span className={`num font-display text-3xl ${ownerSaved >= 0 ? 'text-paper' : 'text-accent'}`}>{money(Math.abs(ownerSaved))}</span>{' '}
+                <span className="text-sm text-paper/70">{ownerSaved >= 0 ? 'under' : 'over'} the quote across {data.ownerSavings.length}</span>
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Burn-up */}
+        <section className="reveal lg:col-span-8 bg-sand rounded-sm p-5 sm:p-7" style={at(3)}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-display text-3xl">Running total</h2>
+            {budget > 0 && <p className="text-xs text-ink-3"><span className="inline-block w-4 border-t-2 border-dashed border-accent align-middle mr-2" />budget {shortMoney(budget)}</p>}
+          </div>
+          <div className="mt-4 h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.monthly} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="burn" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={INK} stopOpacity={0.28} />
+                    <stop offset="100%" stopColor={INK} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke={INK} strokeOpacity={0.08} />
+                <XAxis dataKey="month" tickFormatter={monthLabel} tick={axis} axisLine={false} tickLine={false} minTickGap={24} />
+                <YAxis tickFormatter={shortMoney} tick={axis} axisLine={false} tickLine={false} width={52} domain={[0, (max: number) => Math.max(max, budget) * 1.06]} />
+                <Tooltip contentStyle={tooltipStyle} labelFormatter={l => monthLabel(String(l))} formatter={v => [money(Number(v)), 'Spent to date']} />
+                {budget > 0 && <ReferenceLine y={budget} stroke={ACCENT} strokeDasharray="5 5" strokeWidth={1.5} />}
+                <Area type="monotone" dataKey="cumulative" stroke={INK} strokeWidth={2} fill="url(#burn)" isAnimationActive={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        {/* Needs a look */}
+        <section className="reveal lg:col-span-4 lg:pt-6" style={at(4)}>
+          <h2 className="font-display text-3xl">Needs a look</h2>
+          {data.issues.length === 0 && missingCount === 0 ? (
+            <p className="mt-4 text-ink-2">Nothing stands out. Every payment has a category, a vendor and a payer.</p>
+          ) : (
+            <ol className="mt-5 space-y-5">
+              {data.issues.slice(0, 6).map((issue, i) => (
+                <li key={`${issue.kind}-${i}`} className="flex gap-4">
+                  <span className="num font-display text-2xl leading-none text-accent w-6 shrink-0">{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className="font-medium">{issue.title}{issue.amount > 0 && <span className="text-ink-3 font-normal num"> · {money(issue.amount)}</span>}</p>
+                    <Link href={`/dashboard/expenses?q=${encodeURIComponent(issue.search)}`} className="text-sm text-ink-2 hover:text-accent break-words">{issue.detail} →</Link>
+                  </div>
+                </li>
+              ))}
+              {missingCount > 0 && (
+                <li className="flex gap-4">
+                  <span className="num font-display text-2xl leading-none text-accent w-6 shrink-0">{Math.min(data.issues.length, 6) + 1}</span>
+                  <div className="text-sm text-ink-2">
+                    <p className="font-medium text-ink text-base">Missing details</p>
+                    {[[data.missing.category, 'without a category', 'category=none'], [data.missing.vendor, 'without a vendor', 'vendor=none'], [data.missing.paidBy, 'without a payer', 'paidBy=none']]
+                      .filter(([n]) => Number(n) > 0)
+                      .map(([n, label, query]) => (
+                        <Link key={String(label)} href={`/dashboard/expenses?${query}`} className="block hover:text-accent">{n} {label} →</Link>
+                      ))}
+                  </div>
+                </li>
+              )}
+            </ol>
+          )}
+        </section>
+
+        {/* Categories */}
+        <section className="reveal lg:col-span-7 lg:row-span-2" style={at(5)}>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-3xl">Where it went</h2>
+            <Link href="/dashboard/budget" className="text-sm text-ink-3 hover:text-accent">Category budgets →</Link>
+          </div>
+          <ul className="mt-6 space-y-3.5">
+            {categories.map(c => {
+              const overCat = c.budget > 0 && c.total > c.budget;
+              return (
+                <li key={c.name}>
+                  <div className="flex items-baseline justify-between gap-4 text-sm">
+                    <span className="truncate text-ink">{c.name}</span>
+                    <span className="num whitespace-nowrap">
+                      <span className={overCat ? 'text-accent font-medium' : 'text-ink'}>{money(c.total)}</span>
+                      {c.budget > 0 && <span className="text-ink-3"> / {shortMoney(c.budget)}</span>}
+                    </span>
+                  </div>
+                  <div className="relative mt-1.5 h-1.5 rounded-full bg-ink/[0.07]">
+                    <div className={`absolute inset-y-0 left-0 rounded-full ${overCat ? 'bg-accent' : 'bg-ink'}`} style={{ width: `${(c.total / maxCategory) * 100}%` }} />
+                    {c.budget > 0 && <div className="absolute -top-1 -bottom-1 w-[2px] bg-ink-3" style={{ left: `${(c.budget / maxCategory) * 100}%` }} title={`Budget ${money(c.budget)}`} />}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {data.byCategory.length > 12 && (
+            <button onClick={() => setAllCategories(!allCategories)} className="mt-5 text-sm text-ink-2 underline underline-offset-4 decoration-ink/20 hover:text-accent">
+              {allCategories ? 'Show the top 12' : `Show all ${data.byCategory.length} categories`}
             </button>
           )}
-          <p className="text-xs text-gray-400 mt-1">click to edit</p>
-        </div>
-        <StatCard label="Remaining" value={data.budget ? money(data.remaining) : '—'} tone={data.budget && data.remaining < 0 ? 'red' : undefined}
-          sub={data.budget ? `${budgetPercent.toFixed(1)}% used` : 'set a budget'} />
-        <StatCard label="Paid by owner" value={money(data.byPaidBy.Owner)} sub={`${pct(data.byPaidBy.Owner, data.totalSpent)} of total`} dot={OWNER} />
-        <StatCard label="Paid by builder" value={money(data.byPaidBy.Builder)} sub={`${pct(data.byPaidBy.Builder, data.totalSpent)} of total`} dot={BUILDER} />
-      </div>
+          <p className="mt-4 text-xs text-ink-3">The grey tick on a bar is that category&apos;s budget. Bars turn red past it.</p>
+        </section>
 
-      {data.budget > 0 && (
-        <div className="bg-white rounded-xl p-5 shadow-sm">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="font-semibold text-gray-700">Budget used</span>
-            <span className={budgetPercent > 100 ? 'text-red-600 font-semibold' : 'text-gray-500'}>
-              {budgetPercent > 100 ? `${money(-data.remaining)} over budget` : `${money(data.remaining)} left`}
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div className={`h-3 rounded-full ${budgetPercent > 100 ? 'bg-red-500' : budgetPercent > 90 ? 'bg-amber-500' : 'bg-green-500'}`}
-              style={{ width: `${Math.min(budgetPercent, 100)}%` }} />
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Panel title="Cumulative spend vs budget">
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={data.monthly} margin={{ right: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={short} tick={{ fontSize: 11 }} width={56} domain={[0, (max: number) => Math.max(max, data.budget) * 1.05]} />
-              <Tooltip formatter={v => money(Number(v))} />
-              {data.budget > 0 && <ReferenceLine y={data.budget} stroke="#EF4444" strokeDasharray="6 4" label={{ value: 'Budget', position: 'insideTopLeft', fontSize: 11, fill: '#EF4444' }} />}
-              <Line type="monotone" dataKey="cumulative" name="Spent to date" stroke="#2563EB" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </Panel>
-
-        <Panel title="Monthly spend by who paid">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={data.monthly}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={short} tick={{ fontSize: 11 }} width={56} />
-              <Tooltip formatter={v => money(Number(v))} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Owner" stackId="a" fill={OWNER} />
-              <Bar dataKey="Builder" stackId="a" fill={BUILDER} />
-              {data.byPaidBy.Unassigned > 0 && <Bar dataKey="Unassigned" stackId="a" fill={OTHER} />}
-            </BarChart>
-          </ResponsiveContainer>
-        </Panel>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Panel title={hasCategoryBudgets ? 'Spend vs budget by category' : 'Spend by category'}
-            action={<Link href="/dashboard/budget" className="text-sm text-blue-600">{hasCategoryBudgets ? 'Edit budgets' : 'Set category budgets'}</Link>}>
-            <ResponsiveContainer width="100%" height={Math.max(260, categoryRows.length * 24 + 40)}>
-              <BarChart data={categoryRows} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tickFormatter={short} tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="name" width={210} tick={{ fontSize: 11 }} interval={0} />
-                <Tooltip formatter={v => money(Number(v))} />
-                {hasCategoryBudgets && <Legend wrapperStyle={{ fontSize: 12 }} />}
-                <Bar dataKey="total" name="Spent" fill="#3B82F6" radius={[0, 4, 4, 0]} />
-                {hasCategoryBudgets && <Bar dataKey="budget" name="Budget" fill="#D1D5DB" radius={[0, 4, 4, 0]} />}
+        {/* Monthly by payer */}
+        <section className="reveal lg:col-span-5 bg-dune/60 rounded-sm p-5 sm:p-7" style={at(6)}>
+          <h2 className="font-display text-3xl">Month by month</h2>
+          <p className="text-xs text-ink-3 mt-1">
+            <span className="inline-block h-2 w-2 rounded-full bg-accent mr-1.5" />Owner
+            <span className="inline-block h-2 w-2 rounded-full bg-ink ml-4 mr-1.5" />Builder
+          </p>
+          <div className="mt-4 h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.monthly} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke={INK} strokeOpacity={0.08} />
+                <XAxis dataKey="month" tickFormatter={monthLabel} tick={axis} axisLine={false} tickLine={false} minTickGap={16} />
+                <YAxis tickFormatter={shortMoney} tick={axis} axisLine={false} tickLine={false} width={44} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: INK, fillOpacity: 0.05 }} labelFormatter={l => monthLabel(String(l))} formatter={v => money(Number(v))} />
+                <Bar dataKey="Owner" stackId="p" fill={ACCENT} isAnimationActive={false} />
+                <Bar dataKey="Builder" stackId="p" fill={INK} isAnimationActive={false} />
+                {byPaidBy.Unassigned > 0 && <Bar dataKey="Unassigned" stackId="p" fill={CLAY} isAnimationActive={false} />}
               </BarChart>
             </ResponsiveContainer>
-            {overBudget.length > 0 && (
-              <p className="text-sm text-red-600 mt-2">Over budget: {overBudget.map(c => `${c.name} (+${money(c.total - c.budget)})`).join(', ')}</p>
-            )}
-          </Panel>
-        </div>
-
-        <Panel title="Top vendors">
-          <div className="space-y-2">
-            {data.topVendors.map(v => (
-              <div key={v.name}>
-                <div className="flex justify-between text-sm">
-                  <span className={v.name === '(no vendor)' ? 'text-amber-600' : 'text-gray-700'}>{v.name}</span>
-                  <span className="font-medium text-gray-800">{money(v.total)}</span>
-                </div>
-                <div className="h-1.5 bg-gray-100 rounded-full">
-                  <div className="h-1.5 bg-blue-400 rounded-full" style={{ width: `${(v.total / data.topVendors[0].total) * 100}%` }} />
-                </div>
-              </div>
-            ))}
           </div>
-        </Panel>
+        </section>
+
+        {/* Vendors */}
+        <section className="reveal lg:col-span-5 lg:pl-7" style={at(7)}>
+          <h2 className="font-display text-3xl">Paid to</h2>
+          <ol className="mt-5 space-y-2.5">
+            {data.topVendors.map((v, i) => (
+              <li key={v.name} className="flex items-baseline gap-3 text-sm">
+                <span className="num text-[11px] text-ink-3 w-5">{String(i + 1).padStart(2, '0')}</span>
+                <Link href={v.name === '(no vendor)' ? '/dashboard/expenses?vendor=none' : `/dashboard/expenses?q=${encodeURIComponent(v.name)}`}
+                  className={`flex-1 truncate hover:text-accent ${v.name === '(no vendor)' ? 'italic text-ink-3' : ''}`}>
+                  {v.name === '(no vendor)' ? 'No vendor recorded' : v.name}
+                </Link>
+                <span className="text-ink-3 text-xs num">{v.count}×</span>
+                <span className="num w-24 text-right">{money(v.total)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        {/* Latest */}
+        <section className="reveal lg:col-span-12 grid lg:grid-cols-12 gap-x-10 gap-y-4 bg-sand/60 rounded-sm p-5 sm:p-7 lg:p-9" style={at(8)}>
+          <div className="lg:col-span-4">
+            <h2 className="font-display text-4xl leading-none">Latest <span className="italic">entries</span></h2>
+            <Link href="/dashboard/expenses" className="inline-block mt-4 text-sm text-ink-2 hover:text-accent">The full ledger →</Link>
+          </div>
+          <ul className="lg:col-span-8 divide-y divide-ink/10">
+            {data.recentExpenses.map(e => (
+              <li key={e.id} className="flex items-baseline gap-4 py-3 first:pt-0">
+                <span className="num text-xs text-ink-3 w-24 shrink-0">{longDate(e.date)}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate">{e.description}</span>
+                  <span className="text-xs text-ink-3">{e.category_name || 'Uncategorized'}{e.paid_by && <> · <span className={e.paid_by === 'Owner' ? 'text-accent' : ''}>{e.paid_by}</span></>}</span>
+                </span>
+                <span className="num">{money(e.amount, true)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
-
-      <Panel title="Recent expenses" action={<Link href="/dashboard/expenses" className="text-sm text-blue-600">View all</Link>}>
-        <div className="divide-y">
-          {data.recentExpenses.map(exp => (
-            <div key={exp.id} className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-gray-800">{exp.description}</p>
-                <p className="text-xs text-gray-500">{exp.category_name || 'Uncategorized'} · {exp.date}{exp.paid_by ? ` · ${exp.paid_by}` : ''}</p>
-              </div>
-              <span className="font-semibold text-gray-800">{money(exp.amount)}</span>
-            </div>
-          ))}
-        </div>
-      </Panel>
-    </div>
-  );
-}
-
-function pct(part: number, total: number) {
-  return total ? `${Math.round((part / total) * 100)}%` : '0%';
-}
-
-function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-xl p-5 shadow-sm">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="font-semibold text-gray-700">{title}</h3>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function StatCard({ label, value, sub, tone, dot }: { label: string; value: string; sub?: string; tone?: 'red'; dot?: string }) {
-  return (
-    <div className={`rounded-xl p-5 shadow-sm ${tone === 'red' ? 'bg-red-50' : 'bg-white'}`}>
-      <p className="text-sm text-gray-500 flex items-center gap-2">
-        {dot && <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: dot }} />}
-        {label}
-      </p>
-      <p className={`text-2xl font-bold mt-1 ${tone === 'red' ? 'text-red-700' : 'text-gray-800'}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
     </div>
   );
 }
