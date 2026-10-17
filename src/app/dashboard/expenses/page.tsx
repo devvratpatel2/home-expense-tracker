@@ -12,7 +12,7 @@ import { inferSource } from '@/lib/smart/source';
 interface Expense {
   id: string; description: string; amount: number | string; date: string;
   vendor: string; payment_method: string; paid_by: string; notes: string;
-  category_name: string; category_id: string; receipt_path: string; allocations: string | null;
+  category_name: string; category_id: string; receipt_path: string; allocations: string | null; excluded: number;
 }
 interface Category { id: string; name: string; }
 type SortKey = 'date' | 'description' | 'category_name' | 'vendor' | 'paid_by' | 'amount';
@@ -84,7 +84,9 @@ export default function ExpensesPage() {
     });
   }, [expenses, search, catFilter, paidByFilter, vendorFilter, from, to, sortKey, sortAsc]);
 
-  const total = visible.reduce((s, e) => s + Number(e.amount), 0);
+  const counted = visible.filter(e => !e.excluded);
+  const total = counted.reduce((s, e) => s + Number(e.amount), 0);
+  const leftOut = visible.length - counted.length;
   const filtersOn = search || catFilter || paidByFilter || vendorFilter || from || to;
 
   // Suggestions ported from build-tracker's rules; they only fill empty fields when accepted.
@@ -119,6 +121,20 @@ export default function ExpensesPage() {
       setError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function setCounted(exp: Expense, count: boolean) {
+    const flip = (excluded: number) => setExpenses(list => list.map(e => (e.id === exp.id ? { ...e, excluded } : e)));
+    flip(count ? 0 : 1);
+    const res = await fetch('/api/expenses', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: exp.id, excluded: !count }),
+    });
+    if (!res.ok) {
+      flip(count ? 1 : 0);
+      setError((await res.json().catch(() => ({}))).error || 'Couldn’t update that payment');
     }
   }
 
@@ -206,7 +222,7 @@ export default function ExpensesPage() {
         <div className="lg:col-span-5 flex flex-wrap items-end justify-between gap-4 lg:pb-2">
           <p className="text-ink-2">
             <span className="num font-display text-4xl text-ink">{money(total)}</span>
-            <span className="block text-sm text-ink-3">{visible.length}{filtersOn ? ` of ${expenses.length}` : ''} entries</span>
+            <span className="block text-sm text-ink-3">{visible.length}{filtersOn ? ` of ${expenses.length}` : ''} entries{leftOut > 0 && `, ${leftOut} left out of the total`}</span>
           </p>
           <div className="flex gap-2">
             <button onClick={exportCsv} className="btn-quiet">Export CSV</button>
@@ -335,6 +351,7 @@ export default function ExpensesPage() {
         <table className="ledger">
           <thead>
             <tr>
+              <th className="w-8"><span className="sr-only">Counted in the total</span></th>
               {header('date', 'Date')}
               {header('description', 'Description')}
               {header('category_name', 'Category')}
@@ -345,9 +362,12 @@ export default function ExpensesPage() {
           </thead>
           <tbody>
             {visible.map(exp => editId === exp.id ? (
-              <tr key={exp.id}><td colSpan={6} className="!p-0">{editor}</td></tr>
+              <tr key={exp.id}><td colSpan={7} className="!p-0">{editor}</td></tr>
             ) : (
-              <tr key={exp.id} onClick={() => startEdit(exp)} className={canEdit ? 'cursor-pointer hover:bg-sand/50 transition-colors' : ''}>
+              <tr key={exp.id} onClick={() => startEdit(exp)} className={`${canEdit ? 'cursor-pointer hover:bg-sand/50 transition-colors' : ''} ${exp.excluded ? 'text-ink-3' : ''}`}>
+                <td onClick={e => e.stopPropagation()} className="!pr-0">
+                  <CountBox exp={exp} canEdit={canEdit} onChange={setCounted} />
+                </td>
                 <td className="whitespace-nowrap text-ink-3 num">{longDate(exp.date)}</td>
                 <td className="max-w-md">
                   <span>{exp.description}</span>
@@ -358,7 +378,7 @@ export default function ExpensesPage() {
                 <td className="text-ink-2">{exp.category_name || <span className="italic text-ink-3">Uncategorized</span>}</td>
                 <td className="text-ink-2">{exp.vendor || <span className="text-ink-3">—</span>}</td>
                 <td><Payer value={exp.paid_by} /></td>
-                <td className="text-right whitespace-nowrap num font-medium">{money(Number(exp.amount), true)}</td>
+                <td className={`text-right whitespace-nowrap num font-medium ${exp.excluded ? 'line-through decoration-ink-3' : ''}`}>{money(Number(exp.amount), true)}</td>
               </tr>
             ))}
           </tbody>
@@ -369,13 +389,18 @@ export default function ExpensesPage() {
       <ul className="reveal md:hidden mt-6 divide-y divide-ink/10" style={at(2)}>
         {visible.map(exp => (
           <li key={exp.id}>
-            {editId === exp.id ? editor : canEdit ? (
-              <button onClick={() => startEdit(exp)} className="w-full text-left py-4 flex gap-4">
-                <PhoneRow exp={exp} />
-              </button>
-            ) : (
-              <div className="py-4 flex gap-4">
-                <PhoneRow exp={exp} />
+            {editId === exp.id ? editor : (
+              <div className={`flex items-start gap-3 ${exp.excluded ? 'text-ink-3' : ''}`}>
+                <span className="pt-[1.15rem]"><CountBox exp={exp} canEdit={canEdit} onChange={setCounted} /></span>
+                {canEdit ? (
+                  <button onClick={() => startEdit(exp)} className="flex-1 min-w-0 text-left py-4 flex gap-4">
+                    <PhoneRow exp={exp} />
+                  </button>
+                ) : (
+                  <div className="flex-1 min-w-0 py-4 flex gap-4">
+                    <PhoneRow exp={exp} />
+                  </div>
+                )}
               </div>
             )}
             {!canEdit && exp.receipt_path && <a href={exp.receipt_path} target="_blank" rel="noreferrer" className="-mt-2 mb-3 inline-block text-xs text-accent underline underline-offset-2">Open receipt</a>}
@@ -388,7 +413,7 @@ export default function ExpensesPage() {
           {expenses.length ? 'Nothing matches these filters.' : canEdit ? 'No payments yet. Add one, or import your sheet.' : 'No payments yet.'}
         </p>
       )}
-      {visible.length > 0 && canEdit && <p className="mt-6 text-xs text-ink-3">Click a row to edit it.</p>}
+      {visible.length > 0 && canEdit && <p className="mt-6 text-xs text-ink-3">Click a row to edit it. Untick the box to leave a payment out of every total; the sheet isn’t changed.</p>}
     </div>
   );
 }
@@ -401,10 +426,18 @@ function PhoneRow({ exp }: { exp: Expense }) {
         <span className="block text-xs text-ink-3 mt-1">{longDate(exp.date)} · {exp.category_name || 'Uncategorized'}{exp.vendor && ` · ${exp.vendor}`}</span>
       </span>
       <span className="text-right">
-        <span className="block num font-medium">{money(Number(exp.amount), true)}</span>
+        <span className={`block num font-medium ${exp.excluded ? 'line-through' : ''}`}>{money(Number(exp.amount), true)}</span>
         <Payer value={exp.paid_by} />
       </span>
     </>
+  );
+}
+
+function CountBox({ exp, canEdit, onChange }: { exp: Expense; canEdit: boolean; onChange: (exp: Expense, count: boolean) => void }) {
+  return (
+    <input type="checkbox" checked={!exp.excluded} disabled={!canEdit} onChange={e => onChange(exp, e.target.checked)}
+      aria-label={`Count ${exp.description} in the total`} title={exp.excluded ? 'Left out of the total' : 'Counted in the total'}
+      className="h-4 w-4 accent-accent cursor-pointer disabled:cursor-default align-middle" />
   );
 }
 

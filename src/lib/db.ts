@@ -110,6 +110,8 @@ async function setupSchema() {
   // Databases created by older versions are missing these columns.
   await addColumn('expenses', 'paid_by', 'TEXT');
   await addColumn('expenses', 'allocations', 'TEXT');
+  // Site-only: a payment the owner unticked stays in the list but is left out of every total.
+  await addColumn('expenses', 'excluded', 'INTEGER NOT NULL DEFAULT 0');
   await addColumn('projects', 'sheet_url', 'TEXT');
   await addColumn('projects', 'budget_sheet_url', 'TEXT');
   await addColumn('projects', 'sheet_sync_url', 'TEXT');

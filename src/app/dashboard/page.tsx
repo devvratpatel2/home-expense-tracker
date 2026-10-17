@@ -12,6 +12,7 @@ interface DashboardData {
   totalSpent: number;
   budget: number;
   expenseCount: number;
+  excluded: { count: number; total: number };
   remaining: number;
   firstDate: string;
   lastDate: string;
@@ -45,7 +46,7 @@ export default function DashboardPage() {
 
   if (!data) return <p className="font-display italic text-2xl text-ink-3">Adding it all up…</p>;
 
-  if (data.expenseCount === 0) {
+  if (data.expenseCount + data.excluded.count === 0) {
     return (
       <div className="max-w-3xl lg:ml-[10%] lg:mt-24">
         <h1 className="reveal font-display text-6xl lg:text-7xl leading-[0.95]" style={at(0)}>
@@ -73,6 +74,7 @@ export default function DashboardPage() {
         <p className="eyebrow">{data.projectName || 'Overview'}</p>
         <p className="text-sm text-ink-3">
           {data.expenseCount} payments · {longDate(data.firstDate)} to {longDate(data.lastDate)}
+          {data.excluded.count > 0 && <> · <Link href="/dashboard/expenses" className="hover:text-ink underline underline-offset-4 decoration-ink/20">{money(data.excluded.total)} in {data.excluded.count} left out</Link></>}
         </p>
       </header>
 

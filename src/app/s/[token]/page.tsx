@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { money, longDate } from '@/lib/format';
 import { at } from '@/lib/reveal';
 
-interface Row { id: number; date: string; description: string; amount: number; vendor: string; paid_by: string; category: string }
+interface Row { id: number; date: string; description: string; amount: number; vendor: string; paid_by: string; category: string; counted: boolean }
 interface Shared { projectName: string; expiresAt: string | null; expenses: Row[] }
 type SortKey = 'date' | 'description' | 'category' | 'vendor' | 'paid_by' | 'amount';
 
@@ -47,7 +47,8 @@ export default function SharedExpensesPage({ params }: { params: { token: string
   }
   if (!data) return <main className="min-h-screen grid place-items-center"><p className="font-display italic text-2xl text-ink-3">Opening the ledger…</p></main>;
 
-  const total = visible.reduce((s, e) => s + e.amount, 0);
+  const total = visible.reduce((s, e) => s + (e.counted ? e.amount : 0), 0);
+  const leftOut = visible.filter(e => !e.counted).length;
   const sortBy = (key: SortKey) => {
     if (key === sortKey) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(key !== 'date' && key !== 'amount'); }
@@ -70,7 +71,7 @@ export default function SharedExpensesPage({ params }: { params: { token: string
         </div>
         <p className="lg:col-span-5 lg:text-right lg:pb-2">
           <span className="num font-display text-5xl">{money(total)}</span>
-          <span className="block text-sm text-ink-3">{visible.length}{visible.length !== data.expenses.length ? ` of ${data.expenses.length}` : ''} payments</span>
+          <span className="block text-sm text-ink-3">{visible.length}{visible.length !== data.expenses.length ? ` of ${data.expenses.length}` : ''} payments{leftOut > 0 && `, ${leftOut} not counted`}</span>
         </p>
       </header>
 
@@ -110,13 +111,13 @@ export default function SharedExpensesPage({ params }: { params: { token: string
           </thead>
           <tbody>
             {visible.map(e => (
-              <tr key={e.id}>
+              <tr key={e.id} className={e.counted ? '' : 'text-ink-3'}>
                 <td className="whitespace-nowrap text-ink-3 num">{longDate(e.date)}</td>
                 <td className="max-w-md">{e.description}</td>
                 <td className="text-ink-2">{e.category || <span className="italic text-ink-3">Uncategorized</span>}</td>
                 <td className="text-ink-2">{e.vendor || <span className="text-ink-3">—</span>}</td>
                 <td><span className={`text-xs font-medium ${e.paid_by === 'Owner' ? 'text-accent' : 'text-ink-2'}`}>{e.paid_by || '—'}</span></td>
-                <td className="text-right whitespace-nowrap num font-medium">{money(e.amount, true)}</td>
+                <td className={`text-right whitespace-nowrap num font-medium ${e.counted ? '' : 'line-through'}`}>{money(e.amount, true)}</td>
               </tr>
             ))}
           </tbody>
@@ -125,13 +126,13 @@ export default function SharedExpensesPage({ params }: { params: { token: string
 
       <ul className="reveal md:hidden mt-6 divide-y divide-ink/10" style={at(2)}>
         {visible.map(e => (
-          <li key={e.id} className="py-4 flex gap-4">
+          <li key={e.id} className={`py-4 flex gap-4 ${e.counted ? '' : 'text-ink-3'}`}>
             <span className="flex-1 min-w-0">
               <span className="block">{e.description}</span>
               <span className="block text-xs text-ink-3 mt-1">{longDate(e.date)} · {e.category || 'Uncategorized'}{e.vendor && ` · ${e.vendor}`}</span>
             </span>
             <span className="text-right">
-              <span className="block num font-medium">{money(e.amount, true)}</span>
+              <span className={`block num font-medium ${e.counted ? '' : 'line-through'}`}>{money(e.amount, true)}</span>
               <span className={`text-xs font-medium ${e.paid_by === 'Owner' ? 'text-accent' : 'text-ink-2'}`}>{e.paid_by}</span>
             </span>
           </li>

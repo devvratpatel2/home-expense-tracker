@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   await maybePull(projectId!);
 
   const result = await getDb().execute({
-    sql: `SELECT c.*, COALESCE(SUM(e.amount), 0) as spent, COUNT(e.id) as expense_count
+    sql: `SELECT c.*, COALESCE(SUM(CASE WHEN e.excluded = 1 THEN 0 ELSE e.amount END), 0) as spent, COUNT(e.id) as expense_count
       FROM categories c LEFT JOIN expenses e ON e.category_id = c.id
       WHERE c.project_id = ? GROUP BY c.id ORDER BY c.name`,
     args: [projectId],

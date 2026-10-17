@@ -20,12 +20,14 @@ export async function GET(req: NextRequest) {
 
   const categories = await db.execute({ sql: `SELECT id, name, budget FROM categories WHERE project_id = ?`, args: [projectId] });
   const expenses = await db.execute({
-    sql: `SELECT e.id, e.description, e.amount, e.date, e.vendor, e.paid_by, e.notes, e.allocations, c.name as category_name
+    sql: `SELECT e.id, e.description, e.amount, e.date, e.vendor, e.paid_by, e.notes, e.allocations, e.excluded, c.name as category_name
       FROM expenses e LEFT JOIN categories c ON e.category_id = c.id
       WHERE e.project_id = ? ORDER BY e.date, e.created_at`,
     args: [projectId],
   });
-  const rows = expenses.rows.map(r => ({
+  const left = expenses.rows.filter(r => r.excluded === 1);
+  const excluded = { count: left.length, total: left.reduce((s, r) => s + (Number(r.amount) || 0), 0) };
+  const rows = expenses.rows.filter(r => r.excluded !== 1).map(r => ({
     id: r.id as string,
     description: (r.description as string) || '',
     amount: Number(r.amount) || 0,
@@ -109,6 +111,7 @@ export async function GET(req: NextRequest) {
     totalSpent,
     budget,
     expenseCount: rows.length,
+    excluded,
     remaining: budget - totalSpent,
     firstDate: rows[0]?.date ?? '',
     lastDate: rows[rows.length - 1]?.date ?? '',

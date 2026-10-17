@@ -91,6 +91,20 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({ success: true });
 }
 
+// Ticks a payment in or out of the totals. This lives only on the site, so the sheet isn't called.
+export async function PATCH(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
+
+  const body = await req.json();
+  const projectId = await projectOf('expenses', body.id);
+  if (!(await ownsProject(userId, projectId))) return notFound();
+  if (typeof body.excluded !== 'boolean') return NextResponse.json({ error: 'excluded must be true or false' }, { status: 400 });
+
+  await getDb().execute({ sql: `UPDATE expenses SET excluded = ? WHERE id = ?`, args: [body.excluded ? 1 : 0, body.id] });
+  return NextResponse.json({ success: true });
+}
+
 export async function DELETE(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) return unauthorized();

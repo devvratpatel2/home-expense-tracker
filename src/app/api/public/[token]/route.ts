@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
   await maybePull(row.project_id as string);
 
   const expenses = await db.execute({
-    sql: `SELECT e.date, e.description, e.amount, e.vendor, e.paid_by, c.name AS category
+    sql: `SELECT e.date, e.description, e.amount, e.vendor, e.paid_by, e.excluded, c.name AS category
       FROM expenses e LEFT JOIN categories c ON c.id = e.category_id
       WHERE e.project_id = ? ORDER BY e.date DESC, e.created_at DESC`,
     args: [row.project_id],
@@ -40,6 +40,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
       vendor: e.vendor || '',
       paid_by: e.paid_by === 'Owner' || e.paid_by === 'Builder' ? e.paid_by : '',
       category: e.category || '',
+      counted: e.excluded !== 1,
     })),
   }, { headers });
 }
