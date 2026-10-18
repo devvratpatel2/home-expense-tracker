@@ -282,7 +282,7 @@ export default function DashboardPage() {
         </section>
 
         {/* Latest */}
-        <section className="reveal lg:col-span-12 grid lg:grid-cols-12 gap-x-10 gap-y-4 bg-sand/60 rounded-sm p-5 sm:p-7 lg:p-9" style={at(8)}>
+        <section className="reveal lg:col-span-12 grid grid-cols-1 lg:grid-cols-12 gap-x-10 gap-y-4 bg-sand/60 rounded-sm p-5 sm:p-7 lg:p-9" style={at(8)}>
           <div className="lg:col-span-4">
             <h2 className="font-display text-4xl leading-none">Latest <span className="italic">entries</span></h2>
             <Link href="/dashboard/expenses" className="inline-block mt-4 text-sm text-ink-2 hover:text-accent">The full ledger →</Link>
@@ -290,9 +290,10 @@ export default function DashboardPage() {
           <ul className="lg:col-span-8 divide-y divide-ink/10">
             {data.recentExpenses.map(e => (
               <li key={e.id} className="flex items-baseline gap-4 py-3 first:pt-0">
-                <span className="num text-xs text-ink-3 w-24 shrink-0">{longDate(e.date)}</span>
+                <span className="hidden sm:block num text-xs text-ink-3 w-24 shrink-0">{longDate(e.date)}</span>
                 <span className="flex-1 min-w-0">
                   <span className="block truncate">{e.description}</span>
+                  <span className="sm:hidden block num text-xs text-ink-3">{longDate(e.date)}</span>
                   <span className="text-xs text-ink-3">{e.category_name || 'Uncategorized'}{e.paid_by && <> · <span className={e.paid_by === 'Owner' ? 'text-accent' : ''}>{e.paid_by}</span></>}</span>
                 </span>
                 <span className="num">{money(e.amount, true)}</span>

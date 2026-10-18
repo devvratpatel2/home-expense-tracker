@@ -31,7 +31,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen grid lg:grid-cols-12">
+    <main className="min-h-screen grid grid-cols-1 lg:grid-cols-12">
       <section className="lg:col-span-7 px-6 sm:px-12 lg:pl-20 pt-12 pb-16 flex flex-col">
         <p className="reveal eyebrow" style={at(0)}>Build Ledger</p>
         <div className="mt-auto max-w-2xl lg:ml-[8%]">

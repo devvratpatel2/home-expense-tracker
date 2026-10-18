@@ -37,7 +37,7 @@ function SheetSync({ project, onChange }: { project: Project; onChange: () => vo
   const post = (body: object) => () => fetch('/api/sheet-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, ...body }) });
 
   return (
-    <section className="reveal mt-12 bg-ink text-paper rounded-sm p-6 lg:p-10 grid lg:grid-cols-12 gap-8" style={at(1)}>
+    <section className="reveal mt-12 bg-ink text-paper rounded-sm p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8" style={at(1)}>
       <div className="lg:col-span-5">
         <p className="eyebrow text-paper/60">Two-way sync</p>
         <h2 className="font-display text-4xl mt-2">{connected ? 'Your Google Sheet is connected' : 'Keep a Google Sheet in sync'}</h2>
@@ -162,7 +162,7 @@ export default function ImportPage() {
 
       {project && <SheetSync project={project} onChange={loadProject} />}
 
-      <div className="mt-12 grid lg:grid-cols-12 gap-x-12 gap-y-10">
+      <div className="mt-12 grid grid-cols-1 lg:grid-cols-12 gap-x-12 gap-y-10">
         <form onSubmit={importLink} className="reveal lg:col-span-7" style={at(1)}>
           <h2 className="font-display text-4xl">From a Google Sheet</h2>
           <div className="mt-6 flex gap-2" role="radiogroup" aria-label="What the sheet holds">

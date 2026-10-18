@@ -30,6 +30,11 @@
   .ledger tbody tr { @apply border-t border-ink/10; }
 }
 
+/* iOS zooms into any field under 16px when it is tapped and does not zoom back out. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']), select, textarea { font-size: 16px; }
+}
+
 /* The one page-load moment: blocks rise out of a mask, one after another. */
 @keyframes rise {
   from { opacity: 0; transform: translateY(28px); clip-path: inset(0 0 100% 0); }

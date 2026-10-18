@@ -63,7 +63,7 @@ export default function ProgressPage() {
   const doneCount = CONSTRUCTION_PHASES.filter(p => phaseState(p) === 'done').length;
 
   return (
-    <div className="max-w-[1320px] grid lg:grid-cols-12 gap-x-12 gap-y-10">
+    <div className="max-w-[1320px] grid grid-cols-1 lg:grid-cols-12 gap-x-12 gap-y-10">
       <aside className="reveal lg:col-span-4 lg:sticky lg:top-12 self-start" style={at(0)}>
         <p className="eyebrow">On site</p>
         <h1 className="font-display text-6xl lg:text-7xl leading-none mt-2">Progress</h1>
@@ -91,7 +91,7 @@ export default function ProgressPage() {
         )}
 
         {showForm && (
-          <form onSubmit={handleSubmit} className="mt-6 bg-sand rounded-sm p-6 grid sm:grid-cols-2 gap-x-6 gap-y-5">
+          <form onSubmit={handleSubmit} className="mt-6 bg-sand rounded-sm p-6 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
             <label className="sm:col-span-2 block">
               <span className="eyebrow">Title</span>
               <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="field text-base" />

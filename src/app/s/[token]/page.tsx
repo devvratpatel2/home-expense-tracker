@@ -63,7 +63,7 @@ export default function SharedExpensesPage({ params }: { params: { token: string
 
   return (
     <main className="min-h-screen px-5 sm:px-8 lg:px-20 py-10 lg:py-14 max-w-[1400px]">
-      <header className="reveal grid lg:grid-cols-12 gap-6 items-end" style={at(0)}>
+      <header className="reveal grid grid-cols-1 lg:grid-cols-12 gap-6 items-end" style={at(0)}>
         <div className="lg:col-span-7">
           <p className="eyebrow">Build <span className="text-accent">Ledger</span> · {data.projectName}</p>
           <h1 className="font-display text-6xl lg:text-7xl leading-none mt-2">Expenses</h1>
@@ -97,7 +97,7 @@ export default function SharedExpensesPage({ params }: { params: { token: string
         </label>
       </div>
 
-      <div className="reveal hidden md:block mt-6 overflow-x-auto" style={at(2)}>
+      <div className="reveal hidden md:block relative mt-6 overflow-x-auto" style={at(2)}>
         <table className="ledger">
           <thead>
             <tr>

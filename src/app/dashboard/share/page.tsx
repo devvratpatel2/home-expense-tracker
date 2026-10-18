@@ -81,7 +81,7 @@ export default function SharePage() {
   }
 
   return (
-    <div className="max-w-[1320px] grid lg:grid-cols-12 gap-x-12 gap-y-10">
+    <div className="max-w-[1320px] grid grid-cols-1 lg:grid-cols-12 gap-x-12 gap-y-10">
       <header className="reveal lg:col-span-5" style={at(0)}>
         <p className="eyebrow">Keep them in the loop</p>
         <h1 className="font-display text-6xl lg:text-7xl leading-none mt-2">Share</h1>
@@ -147,7 +147,7 @@ export default function SharePage() {
           ) : (
             <ul className="mt-5 divide-y divide-ink/10">
               {viewers.map(v => (
-                <li key={v.email} className="py-5 grid sm:grid-cols-12 gap-x-6 gap-y-2 items-baseline">
+                <li key={v.email} className="py-5 grid grid-cols-1 sm:grid-cols-12 gap-x-6 gap-y-2 items-baseline">
                   <div className="sm:col-span-7 min-w-0">
                     <p className="truncate">{v.name ? <>{v.name} <span className="text-ink-3">· {v.email}</span></> : v.email}</p>
                     <p className="text-xs text-ink-3 mt-0.5">

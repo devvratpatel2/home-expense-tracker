@@ -69,7 +69,7 @@ export default function BudgetPage() {
 
   return (
     <div className="max-w-[1320px]">
-      <div className="grid lg:grid-cols-12 gap-x-10 gap-y-10">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-x-10 gap-y-10">
         <section className="reveal lg:col-span-6" style={at(0)}>
           <p className="eyebrow">The quote</p>
           <h1 className="font-display text-6xl lg:text-7xl leading-none mt-2">Budget</h1>
@@ -103,7 +103,8 @@ export default function BudgetPage() {
                 <span className={`num font-display text-5xl ${totalSaved >= 0 ? '' : 'text-accent'}`}>{money(Math.abs(totalSaved))}</span>
                 <span className="ml-2 text-ink-2">{totalSaved >= 0 ? 'under' : 'over'} the quote overall</span>
               </p>
-              <table className="ledger mt-6">
+              <div className="relative mt-6 overflow-x-auto">
+              <table className="ledger">
                 <thead><tr><th>Category</th><th className="!text-right">Quote</th><th className="!text-right">Spent</th><th className="!text-right">Difference</th></tr></thead>
                 <tbody>
                   {savings.map(s => (
@@ -116,6 +117,7 @@ export default function BudgetPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </>
           ) : (
             <p className="mt-6 text-ink-3 italic">Shows up once categories have budgets and some owner-paid expenses.</p>
@@ -134,14 +136,14 @@ export default function BudgetPage() {
             <button className="btn-ink">Add</button>
           </form>
         </div>
-        <div className="mt-6 overflow-x-auto">
+        <div className="relative mt-6 overflow-x-auto">
           <table className="ledger">
             <thead>
               <tr>
                 <th>Category</th>
                 <th className="!text-right">Spent</th>
                 <th className="!text-right">Budget</th>
-                <th className="w-56">Used</th>
+                <th className="w-56 hidden sm:table-cell">Used</th>
                 <th className="w-16"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -151,17 +153,17 @@ export default function BudgetPage() {
                 const used = c.budget > 0 ? s / Number(c.budget) : 0;
                 return (
                   <tr key={c.id} className="group">
-                    <td className="!py-1.5">
+                    <td className="!py-1.5 min-w-[10rem]">
                       <input defaultValue={c.name} key={`cn-${c.id}-${c.name}`} onBlur={e => e.target.value.trim() && e.target.value !== c.name && saveCategory(c.id, { name: e.target.value })}
                         className="field !border-transparent hover:!border-ink/20 focus:!border-accent" aria-label="Category name" />
                     </td>
-                    <td className="text-right whitespace-nowrap num !py-3.5">{money(s)} <span className="text-xs text-ink-3">· {c.expense_count}</span></td>
+                    <td className="text-right whitespace-nowrap num !py-3.5">{money(s)} <span className="hidden sm:inline text-xs text-ink-3">· {c.expense_count}</span></td>
                     <td className="text-right !py-1.5">
                       <input defaultValue={c.budget ? Number(c.budget) : ''} key={`cb-${c.id}-${c.budget}`} inputMode="decimal" placeholder="—"
                         onBlur={e => toNumber(e.target.value) !== Number(c.budget) && saveCategory(c.id, { budget: toNumber(e.target.value) })}
-                        className="field !w-28 ml-auto text-right num" aria-label={`Budget for ${c.name}`} />
+                        className="field !w-20 sm:!w-28 ml-auto text-right num" aria-label={`Budget for ${c.name}`} />
                     </td>
-                    <td className="!py-4">
+                    <td className="!py-4 hidden sm:table-cell">
                       {c.budget > 0 && (
                         <div className="flex items-center gap-3">
                           <div className="flex-1 h-1.5 rounded-full bg-ink/[0.07] overflow-hidden">
@@ -172,7 +174,7 @@ export default function BudgetPage() {
                       )}
                     </td>
                     <td className="text-right !py-3.5">
-                      <button onClick={() => deleteCategory(c)} className="text-xs text-ink-3 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition-opacity">Delete</button>
+                      <button onClick={() => deleteCategory(c)} className="text-xs text-ink-3 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition-opacity">Delete</button>
                     </td>
                   </tr>
                 );

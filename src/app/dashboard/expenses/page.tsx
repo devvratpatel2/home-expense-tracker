@@ -214,7 +214,7 @@ export default function ExpensesPage() {
     <div className="max-w-[1320px]">
       <datalist id="vendor-list">{vendors.map(v => <option key={v} value={v} />)}</datalist>
 
-      <header className="reveal grid lg:grid-cols-12 gap-6 items-end" style={at(0)}>
+      <header className="reveal grid grid-cols-1 lg:grid-cols-12 gap-6 items-end" style={at(0)}>
         <div className="lg:col-span-7">
           <p className="eyebrow">The ledger</p>
           <h1 className="font-display text-6xl lg:text-7xl leading-none mt-2">Expenses</h1>
@@ -234,7 +234,7 @@ export default function ExpensesPage() {
       {error && <p role="alert" className="mt-6 text-sm text-accent-deep bg-accent-soft/60 rounded-sm px-4 py-2">{error}</p>}
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="mt-8 bg-ink text-paper rounded-sm p-6 lg:p-8 grid lg:grid-cols-12 gap-x-8 gap-y-5 [&_.field]:text-paper [&_.field]:border-paper/25 [&_.field]:placeholder:text-paper/40 [&_.eyebrow]:text-paper/50 [&_option]:text-ink">
+        <form onSubmit={handleSubmit} className="mt-8 bg-ink text-paper rounded-sm p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-5 [&_.field]:text-paper [&_.field]:border-paper/25 [&_.field]:placeholder:text-paper/40 [&_.eyebrow]:text-paper/50 [&_option]:text-ink">
           <label className="lg:col-span-6 block">
             <span className="eyebrow">What was it for</span>
             <input required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="e.g. Home Depot, recessed lights" className="field text-base" />
@@ -347,7 +347,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Wide screens: a ledger table */}
-      <div className="reveal hidden md:block mt-6 overflow-x-auto" style={at(2)}>
+      <div className="reveal hidden md:block relative mt-6 overflow-x-auto" style={at(2)}>
         <table className="ledger">
           <thead>
             <tr>
